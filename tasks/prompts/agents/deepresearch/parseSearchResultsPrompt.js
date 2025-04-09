@@ -10,13 +10,13 @@ function buildParseSearchResultsPrompt({
         },
         {
             role: "user",
-            content: `User searched for "${searchQuery}" on Google. and the following page content was found:
+            content: `User searched for "${searchQuery}" on Google (https://www.google.com/search?q=${encodeURIComponent(searchQuery)}). and the following page content was found:
 <pageContent>${pageContent}</pageContent>
 
 Extract the following information:
 - Title
 - Description
-- URL
+- URL (Generate a well-formed URL if only path is provided)
 - Snippet
             
 OUTPUT: JSON OBJECT WITH ONLY ONE KEY "results"

@@ -120,8 +120,11 @@ The answer MUST BE in string format. IF required, you can use markdown to format
             ],
             models: [
                 model,
-                model,
-                model,
+                "gemini-2.0-flash",
+                "gpt-4o-mini",
+                "claude-3-5-haiku",
+                "deepseek-chat",
+                "qwen-plus",
             ],
             metadata: {
                 runId,

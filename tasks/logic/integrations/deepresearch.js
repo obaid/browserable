@@ -74,10 +74,20 @@ async function searchAndScrape({
                     query
                 )}`,
                 onlyMainContent: true,
-                formats: ["html", "markdown"],
+                formats: ["html", "markdown", "links"],
             });
 
-            scrapedPageContent = gSearchResults?.data?.markdown || "";
+            scrapedPageContent = `
+------
+MARKDOWN
+-------
+${gSearchResults?.data?.markdown || ""}
+
+------
+LINKS
+-------
+${JSON.stringify(gSearchResults?.data?.links || [], null, 2)}
+`;
 
             // trim the scrapedPageContent to 60000 characters
             scrapedPageContent = scrapedPageContent.slice(0, 60000);
@@ -130,6 +140,7 @@ async function searchAndScrape({
                     const scrapeResult = await browserService.scrape({
                         url: link,
                         onlyMainContent: true,
+                        formats: ["markdown"],
                     });
 
                     // console.log("scrapeResult", scrapeResult, link);

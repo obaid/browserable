@@ -58,7 +58,7 @@ class BrowserService {
         this.steelClient =
             process.env.STEEL_API_KEY || steelApiKey
                 ? new Steel({
-                      apiKey: process.env.STEEL_API_KEY || steelApiKey,
+                      steelAPIKey: process.env.STEEL_API_KEY || steelApiKey,
                   })
                 : null;
 
@@ -136,7 +136,7 @@ class BrowserService {
                     height: 1920,
                 },
                 enableWebRecording: true,
-            })
+            });
 
             return {
                 success: true,
@@ -275,11 +275,7 @@ class BrowserService {
         }
     }
 
-    async scrape({
-        url,
-        onlyMainContent = true,
-        formats = ["markdown", "links"],
-    }) {
+    async scrape({ url, onlyMainContent = true, formats = ["markdown"] }) {
         // TODO: (SG) add browserbase support
         if (this.provider === "hyperbrowser") {
             const scrapeResult =
@@ -294,9 +290,11 @@ class BrowserService {
 
             return scrapeResult;
         } else if (this.provider === "steel") {
-            const scrapeResult = await this.steelClient.scrape.startAndWait({
+            const scrapeResult = await this.steelClient.scrape({
                 url,
-                format: formats,
+                format: formats
+                    .map((x) => (x === "html" ? "cleaned_html" : x))
+                    .filter((x) => x !== "links"),
             });
 
             return {
@@ -304,6 +302,7 @@ class BrowserService {
                     markdown: scrapeResult.content.markdown,
                     metadata: scrapeResult.metadata,
                     links: scrapeResult.links,
+                    html: scrapeResult.content.cleaned_html,
                 },
             };
         }
@@ -410,7 +409,7 @@ class BrowserService {
         this.steelClient =
             process.env.STEEL_API_KEY || steelApiKey
                 ? new Steel({
-                      apiKey: process.env.STEEL_API_KEY || steelApiKey,
+                      steelAPIKey: process.env.STEEL_API_KEY || steelApiKey,
                   })
                 : null;
 
