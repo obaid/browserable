@@ -97,19 +97,23 @@ async function runTask() {
 
 ## Demos
 
-Task: On coursera.com find a beginner-level online course about '3d printing' which lasts 1-3 months, and is provided by a renowned university.
+Task: On amazon.com search for a yoga mat at least 6mm thick, non-slip, eco-friendly, and under $50.
 
-https://github.com/user-attachments/assets/d7fa87c9-8965-462d-8fcf-bf265eeb061b
+![amazon-demo](https://github.com/user-attachments/assets/98817aad-786d-43bc-8bbc-09ad33015fa5)
 
 <br><br>
 Task: On arxiv.org locate the latest paper within the 'Nonlinear Sciences - Chaotic Dynamics' category, summarize the abstract, and note the submission date.
 
-https://github.com/user-attachments/assets/93251c2d-3f5f-449e-be34-f7c3eb0ba105
+![arxiv-demo](https://github.com/user-attachments/assets/c8340bad-0331-44a8-b14a-42c9abe8ae21)
 
 <br><br>
-Task: On amazon.com search for a yoga mat at least 6mm thick, non-slip, eco-friendly, and under $50.
+Task: On coursera.com find a beginner-level online course about '3d printing' which lasts 1-3 months, and is provided by a renowned university.
 
-https://github.com/user-attachments/assets/e4b9e592-6cf4-48eb-9123-94baa4d31d0a
+![coursera-demo](https://github.com/user-attachments/assets/ea62d794-dccc-4517-a5be-6af82de9b5a5)
+
+
+
+
 
 
 ## Configuration options
