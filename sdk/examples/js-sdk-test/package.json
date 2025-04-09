@@ -1,0 +1,20 @@
+{
+  "name": "js-sdk-test",
+  "version": "1.0.0",
+  "description": "Test project for Browserable JS SDK",
+  "main": "index.js",
+  "scripts": {
+    "test": "node index.js"
+  },
+  "keywords": [
+    "browserable",
+    "sdk",
+    "test"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.6.7",
+    "browserable-js": "^1.0.1"
+  }
+}

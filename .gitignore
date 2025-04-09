@@ -36,3 +36,6 @@ sdk/browserable-js/dist
 sdk/browserable-js/coverage
 sdk/browserable-js/test
 sdk/browserable-js/test-results
+
+# Add all node_modules folders of all subdirectories
+**/node_modules

@@ -136,7 +136,7 @@ class BrowserService {
                     height: 1920,
                 },
                 enableWebRecording: true,
-            });
+            })
 
             return {
                 success: true,
