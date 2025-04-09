@@ -8,7 +8,7 @@ const {
     },
 } = require("../../prompts");
 const { callOpenAICompatibleLLMWithRetry } = require("../../services/llm");
-const { browserService } = require("../../services/browser");
+const browserService = require("../../services/browser");
 const { encode } = require("gpt-tokenizer/encoding/cl100k_base");
 
 // V1 is pure scraping.
