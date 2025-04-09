@@ -78,24 +78,36 @@ async function dockerBaseCommand() {
 
 async function startDockerCompose() {
   spinner.stop();
-  console.log(chalk.blue('Starting Docker containers...'));
+  console.log(chalk.blue('Building Docker containers...'));
   const dockerCmd = await dockerBaseCommand();
   try {
     process.chdir(REPO_FOLDER + '/deployment');
     // Split the command into parts if it's 'docker compose'
     if (dockerCmd === 'docker compose') {
+      // First build
+      await execa('docker', ['compose', '-f', 'docker-compose.dev.yml', 'build'], {
+        stdio: 'inherit'
+      });
+      // Then start
+      console.log(chalk.blue('\nStarting Docker containers...'));
       await execa('docker', ['compose', '-f', 'docker-compose.dev.yml', 'up', '-d'], {
         stdio: 'inherit'
       });
     } else {
+      // First build
+      await execa(dockerCmd, ['-f', 'docker-compose.dev.yml', 'build'], {
+        stdio: 'inherit'
+      });
+      // Then start
+      console.log(chalk.blue('\nStarting Docker containers...'));
       await execa(dockerCmd, ['-f', 'docker-compose.dev.yml', 'up', '-d'], {
         stdio: 'inherit'
       });
     }
-    console.log(chalk.green('\nDocker containers started successfully'));
+    console.log(chalk.green('\nDocker containers built and started successfully'));
     return true;
   } catch (error) {
-    console.error(chalk.red('Failed to start Docker containers'));
+    console.error(chalk.red('Failed to build or start Docker containers'));
     console.error(chalk.red(error.message));
     return false;
   }

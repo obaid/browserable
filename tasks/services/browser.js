@@ -123,10 +123,10 @@ class BrowserService {
         } else if (this.provider === "hyperbrowser") {
             // HYPERBROWSER VERSION
             const session = await this.hyperbrowserClient.sessions.create({
-                solveCaptchas: true,
-                adblock: true,
-                annoyances: true,
-                trackers: true,
+                // solveCaptchas: true,
+                // adblock: true,
+                // annoyances: true,
+                // trackers: true,
                 profile: {
                     id: profileId,
                     persistChanges: true,
