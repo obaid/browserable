@@ -41,7 +41,7 @@ Start the development environment:
 Set your API keys:
   - Open Browserable admin dashboard: [http://localhost:2001/dash/@admin/settings](http://localhost:2001/dash/@admin/settings).
   - Set API key of any one LLM provider (Gemini/ Open AI/ Claude).
-  - Sign up for a free plan with any one remote browser provider ([Hyperbrowser](https://hyperbrowser.ai/)/ [Steel](https://steel.dev/)/ [Browserbase](https://www.browserbase.com/)).
+  - Sign up for a free plan with any one remote browser provider ([Hyperbrowser](https://hyperbrowser.ai/)/ [Steel](https://steel.dev/)).
   - Set the API key of the remote browser provider in your [Browserable admin dashboard](http://localhost:2001/dash/@admin/settings).
 
 ## Services

@@ -68,6 +68,8 @@ async function setupBaseUser() {
                 browserbaseApiKey:
                     accounts[0].metadata.userBrowserApiKeys.browserbase,
                 steelApiKey: accounts[0].metadata.userBrowserApiKeys.steel,
+                browserbaseProjectId:
+                    accounts[0].metadata.userBrowserApiKeys.browserbaseProjectId,
             });
         }
     }

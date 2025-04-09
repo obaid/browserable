@@ -151,7 +151,8 @@ function SettingsContainer(props) {
   const [browserApiKeys, setBrowserApiKeys] = useState({
     hyperBrowser: userBrowserApiKeys?.hyperBrowser || "",
     steel: userBrowserApiKeys?.steel || "",
-    browserbase: userBrowserApiKeys?.browserbase || "",
+    // browserbase: userBrowserApiKeys?.browserbase || "",
+    // browserbaseProjectId: userBrowserApiKeys?.browserbaseProjectId || "",
   });
 
   // Update llmApiKeys when account data changes
@@ -171,7 +172,8 @@ function SettingsContainer(props) {
         hyperBrowser:
           account.data.metadata.userBrowserApiKeys.hyperBrowser || "",
         steel: account.data.metadata.userBrowserApiKeys.steel || "",
-        browserbase: account.data.metadata.userBrowserApiKeys.browserbase || "",
+        // browserbase: account.data.metadata.userBrowserApiKeys.browserbase || "",
+        // browserbaseProjectId: account.data.metadata.userBrowserApiKeys.browserbaseProjectId || "",
       });
     }
   }, [account.data]);
@@ -188,7 +190,8 @@ function SettingsContainer(props) {
       JSON.stringify({
         hyperBrowser: userBrowserApiKeys?.hyperBrowser || "",
         steel: userBrowserApiKeys?.steel || "",
-        browserbase: userBrowserApiKeys?.browserbase || "",
+        // browserbase: userBrowserApiKeys?.browserbase || "",
+        // browserbaseProjectId: userBrowserApiKeys?.browserbaseProjectId || "",
       });
 
   // Handle API key changes
@@ -346,7 +349,8 @@ function SettingsContainer(props) {
                       {Object.entries({
                         HyperBrowser: "hyperBrowser",
                         Steel: "steel",
-                        Browserbase: "browserbase",
+                        // Browserbase: "browserbase",
+                        // "Browserbase Project ID": "browserbaseProjectId",
                       }).map(([displayName, provider]) => (
                         <tr
                           key={provider}
@@ -364,7 +368,7 @@ function SettingsContainer(props) {
                                   e.target.value
                                 )
                               }
-                              placeholder={`Enter ${displayName} API Key`}
+                              placeholder={`Enter ${displayName} ${provider === "browserbaseProjectId" ? "" : "API Key"}`}
                             />
                           </td>
                           <td className="py-1.5 px-6">

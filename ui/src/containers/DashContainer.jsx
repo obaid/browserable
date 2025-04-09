@@ -167,7 +167,7 @@ function Dash(props) {
                         the following providers to start using the application:{" "}
                         <br />
                         <ul className="list-disc list-inside">
-                          <li>Browserbase</li>
+                          {/* <li>Browserbase</li> */}
                           <li>Steel</li>
                           <li>Hyperbrowser</li>
                         </ul>

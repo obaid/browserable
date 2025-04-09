@@ -220,6 +220,7 @@ router.post(
                 hyperbrowserApiKey: metadata.userBrowserApiKeys.hyperBrowser,
                 browserbaseApiKey: metadata.userBrowserApiKeys.browserbase,
                 steelApiKey: metadata.userBrowserApiKeys.steel,
+                browserbaseProjectId: metadata.userBrowserApiKeys.browserbaseProjectId,
             });
         }
 

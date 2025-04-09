@@ -7,7 +7,7 @@ const crypto = require("crypto");
 const { chromium } = require("playwright");
 
 class BrowserService {
-    constructor({ hyperbrowserApiKey, browserbaseApiKey, steelApiKey } = {}) {
+    constructor({ hyperbrowserApiKey, browserbaseApiKey, browserbaseProjectId, steelApiKey } = {}) {
         this.hyperbrowserClient =
             process.env.HYPER_BROWSER_API_KEY || hyperbrowserApiKey
                 ? new Hyperbrowser({
@@ -23,6 +23,7 @@ class BrowserService {
                           process.env.BROWSERBASE_API_KEY || browserbaseApiKey,
                   })
                 : null;
+        this.browserbaseProjectId = process.env.BROWSERBASE_PROJECT_ID || browserbaseProjectId;
 
         // TODO: (SG) Playwright client is not tested yet.
         this.playwrightClient = process.env.PLAYWRIGHT_URL
@@ -99,7 +100,7 @@ class BrowserService {
         } else if (this.provider === "browserbase") {
             // BROWSERBASE VERSION
             const profile = await this.browserbaseClient.contexts.create({
-                projectId: process.env.BROWSERBASE_PROJECT_ID,
+                projectId: this.browserbaseProjectId,
             });
             return profile.id;
         }
@@ -167,7 +168,7 @@ class BrowserService {
         } else if (this.provider === "browserbase") {
             // BROWSERBASE VERSION
             const session = await this.browserbaseClient.sessions.create({
-                projectId: process.env.BROWSERBASE_PROJECT_ID,
+                projectId: this.browserbaseProjectId,
                 browserSettings: {
                     context: {
                         id: profileId,
@@ -178,8 +179,8 @@ class BrowserService {
                         height: 1920,
                     },
                 },
-                keepAlive: true, // available in starter plan only
-                timeout: 60 * 60 * 1000,
+                // keepAlive: true, // available in starter plan only
+                // timeout: 60 * 60 * 1000, // available in starter plan only so removing for now
             });
             return session;
         }
@@ -205,7 +206,7 @@ class BrowserService {
                 return context;
             } else if (this.provider === "browserbase") {
                 await this.browserbaseClient.sessions.update(sessionId, {
-                    projectId: process.env.BROWSERBASE_PROJECT_ID,
+                    projectId: this.browserbaseProjectId,
                     status: "REQUEST_RELEASE",
                 });
             }
@@ -390,7 +391,7 @@ class BrowserService {
         delete this.PLAYWRIGHT_CONNECTIONS[sessionId];
     }
 
-    async resetClients({ hyperbrowserApiKey, browserbaseApiKey, steelApiKey }) {
+    async resetClients({ hyperbrowserApiKey, browserbaseApiKey, browserbaseProjectId, steelApiKey }) {
         this.hyperbrowserClient =
             process.env.HYPER_BROWSER_API_KEY || hyperbrowserApiKey
                 ? new Hyperbrowser({
@@ -406,6 +407,7 @@ class BrowserService {
                           process.env.BROWSERBASE_API_KEY || browserbaseApiKey,
                   })
                 : null;
+        this.browserbaseProjectId = process.env.BROWSERBASE_PROJECT_ID || browserbaseProjectId;
         this.steelClient =
             process.env.STEEL_API_KEY || steelApiKey
                 ? new Steel({
