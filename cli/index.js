@@ -1,16 +1,22 @@
-#!/usr/bin/env node
+#!/usr/bin/env node --no-warnings
 
 // Suppress experimental warnings
 process.removeAllListeners('warning');
 
-const { program } = require('commander');
-const { execa } = require('execa');
-const ora = require('ora');
-const chalk = require('chalk');
-const inquirer = require('inquirer');
-const fs = require('fs');
-const path = require('path');
-const open = require('open');
+import { program } from 'commander';
+import { execa } from 'execa';
+import ora from 'ora';
+import chalk from 'chalk';
+import inquirer from 'inquirer';
+import fs from 'fs';
+import path from 'path';
+import open from 'open';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
 
 const spinner = ora();
 const REPO_URL = 'https://github.com/browserable/browserable.git';
@@ -147,7 +153,7 @@ async function main() {
 program
   .name('browserable')
   .description('CLI to setup and run Browserable')
-  .version('1.0.0')
+  .version(packageJson.version)
   .action(main);
 
 program.parse(); 
