@@ -1,0 +1,64 @@
+---
+title: "Create Task"
+openapi: "POST /task/create"
+description: "Create a new automated browser task"
+---
+
+### Headers
+
+<ParamField header="x-api-key" type="string" required>
+  Your API key for authentication
+</ParamField>
+
+### Request Body
+
+<ParamField body="task" type="string" required>
+  Natural language description of the task to be automated
+</ParamField>
+
+<ParamField body="agents" type="array" default={["BROWSER_AGENT"]}>
+  List of agents to use for the task
+</ParamField>
+
+<ParamField body="triggers" type="array">
+  List of triggers that determine when the task should run. If null, triggers will be auto-generated. If undefined, defaults to running once immediately.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  <Expandable title="Toggle object">
+    <ResponseField name="taskId" type="string">
+      The ID of the created task
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+```bash
+curl --request POST \
+  --url 'http://localhost:2003/api/v1/task/create' \
+  --header 'x-api-key: <your-api-key>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "task": "Monitor a website for price changes",
+    "agents": ["BROWSER_AGENT"],
+    "triggers": ["crontab|0 */6 * * *|"]
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "success": true,
+  "data": {
+    "taskId": "task_123"
+  }
+}
+```
+</ResponseExample>

@@ -1,0 +1,182 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Browserable",
+  "colors": {
+    "primary": "#3064E3",
+    "light": "#3064E3",
+    "dark": "#3064E3"
+  },
+  "favicon": {
+    "light": "/favicon.ico",
+    "dark": "/favicon.ico"
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "getting-started/introduction",
+              "quickstart",
+              "getting-started/demos"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "development/local-development",
+              "development/environment-variables",
+              "development/roadmap"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/custom-functions",
+              "guides/self-hosting"
+            ]
+          },
+          {
+            "group": "Customization",
+            "pages": [
+              "guides/customization/storage",
+              "guides/customization/database",
+              "guides/customization/llm",
+              "guides/customization/remote-browsers"
+            ]
+          },
+          {
+            "group": "Admin Interface",
+            "pages": [
+              "guides/admin/api-keys",
+              "guides/admin/task-creation",
+              "guides/admin/flow-chart",
+              "guides/admin/llm-calls",
+              "guides/admin/data-table"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "REST API",
+        "groups": [
+          {
+            "group": "API Documentation",
+            "pages": [
+              "rest-api/introduction"
+            ]
+          },
+          {
+            "group": "System Endpoints",
+            "pages": [
+              "rest-api/endpoint/health",
+              "rest-api/endpoint/check"
+            ]
+          },
+          {
+            "group": "Task Management",
+            "pages": [
+              "rest-api/endpoint/list-tasks",
+              "rest-api/endpoint/create-task",
+              "rest-api/endpoint/task-stop"
+            ]
+          },
+          {
+            "group": "Run Management",
+            "pages": [
+              "rest-api/endpoint/task-runs",
+              "rest-api/endpoint/task-run-status",
+              "rest-api/endpoint/task-run-result",
+              "rest-api/endpoint/task-run-stop"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "JS SDK",
+        "groups": [
+          {
+            "group": "JS SDK",
+            "pages": [
+              "js-sdk/introduction",
+              "js-sdk/authentication",
+              "js-sdk/tasks",
+              "js-sdk/api-reference"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Cloud",
+        "groups": [
+          {
+            "group": "Cloud",
+            "pages": [
+              "cloud/introduction"
+            ]
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "Join Discord",
+          "href": "https://discord.gg/b6s9fXNjeQ",
+          "icon": "discord",
+          "primary": true
+        },
+        {
+          "anchor": "GitHub",
+          "href": "https://github.com/browserable/browserable",
+          "icon": "github"
+        },
+        {
+          "anchor": "Twitter",
+          "href": "https://x.com/browserable",
+          "icon": "twitter"
+        },
+        {
+          "anchor": "Blog",
+          "href": "https://browserable.ai/blog",
+          "icon": "newspaper"
+        }
+      ]
+    }
+  },
+  "logo": {
+    "light": "/browserable-ai.png",
+    "dark": "/browserable-ai-invert.png"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Discord",
+        "href": "https://discord.gg/b6s9fXNjeQ"
+      },
+      {
+        "label": "Twitter",
+        "href": "https://x.com/browserable"
+      },
+      {
+        "label": "Support",
+        "href": "mailto:sid@browserable.ai"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Github Repo",
+      "href": "https://github.com/browserable/browserable"
+    }
+  },
+  "footer": {
+    "socials": {
+      "x": "https://x.com/browserable",
+      "github": "https://github.com/browserable/browserable",
+      "discord": "https://discord.gg/b6s9fXNjeQ"
+    }
+  }
+}

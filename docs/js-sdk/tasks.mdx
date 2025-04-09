@@ -1,0 +1,205 @@
+---
+title: 'Task Management'
+description: 'Learn how to create, monitor, and manage automated browser tasks using the Browserable JavaScript SDK.'
+---
+
+
+## Creating Tasks
+
+Create a new task using the `createTask` method:
+
+```typescript
+const result = await browserable.createTask({
+  task: 'find the top trending GitHub repos of the day.',
+  agents: ['BROWSER_AGENT'], // Optional
+  triggers: ['once|0|'] // Optional
+});
+
+if (result.success && result.data) {
+  const taskId = result.data.taskId;
+  console.log('Task created:', taskId);
+}
+```
+
+### Task Options
+
+- `task` (required): Natural language description of what you want to automate
+- `agents`: Array of agent types to use (defaults to `['BROWSER_AGENT']`)
+- `triggers`: Array of trigger conditions (defaults to `['once|0|']`)
+
+## Listing Tasks
+
+Get a list of all your tasks with pagination support:
+
+```typescript
+const result = await browserable.listTasks({
+  page: 1,
+  limit: 10
+});
+
+if (result.success && result.data) {
+  console.log('Total tasks:', result.total);
+  console.log('Tasks:', result.data);
+}
+```
+
+## Managing Task Runs
+
+### List Task Runs
+
+Get all runs for a specific task:
+
+```typescript
+const runs = await browserable.listTaskRuns(taskId, {
+  page: 1,
+  limit: 10
+});
+```
+
+### Check Run Status
+
+Monitor the status of a task run:
+
+```typescript
+const status = await browserable.getTaskRunStatus(taskId, runId);
+
+if (status.success && status.data) {
+  console.log('Run status:', status.data.status);
+  console.log('Detailed status:', status.data.detailedStatus);
+  
+  if (status.data.inputWait) {
+    console.log('Waiting for input:', status.data.inputWait);
+  }
+}
+```
+
+### Get Run Results
+
+Retrieve the results of a completed run:
+
+```typescript
+const results = await browserable.getTaskRunResult(taskId, runId);
+
+if (results.success && results.data) {
+  console.log('Output:', results.data.output);
+  console.log('Data table:', results.data.dataTable);
+}
+```
+
+### Wait for Run Completion
+
+Wait for a task run to complete while monitoring its status:
+
+```typescript
+try {
+  const result = await browserable.waitForRun(taskId, runId, {
+    // Optional: customize polling interval (default: 1000ms)
+    pollInterval: 2000,
+    // Optional: customize timeout (default: 5 minutes)
+    timeout: 300000,
+    // Optional: handle status updates
+    onStatusChange: (status) => {
+      console.log(`Task status: ${status.status}`);
+      
+      // Handle live status updates
+      if (status.liveStatus) {
+        console.log('Live status:', status.liveStatus);
+      }
+      
+      // Handle input wait states
+      if (status.inputWait) {
+        console.log('Waiting for input:', status.inputWait);
+      }
+    }
+  });
+
+  if (result.success && result.data) {
+    console.log('Task completed!');
+    console.log('Output:', result.data.output);
+    console.log('Data table:', result.data.dataTable);
+  }
+} catch (error) {
+  if (error.message.includes('Timeout')) {
+    console.error('Task timed out');
+  } else {
+    console.error('Error while waiting for task:', error);
+  }
+}
+```
+
+This method combines status monitoring and result retrieval into a single convenient call. It will:
+
+1. Poll the task status at regular intervals
+2. Provide status updates through the `onStatusChange` callback
+3. Automatically handle completion and error states
+4. Return the final result when the task completes
+5. Throw an error if the task times out or fails
+
+## Stopping Tasks
+
+### Stop a Task Run
+
+Stop a specific run of a task:
+
+```typescript
+const result = await browserable.stopTaskRun(taskId, runId);
+
+if (result.success) {
+  console.log('Run stopped successfully');
+}
+```
+
+### Stop a Task
+
+Stop a task from running future executions:
+
+```typescript
+const result = await browserable.stopTask(taskId);
+
+if (result.success) {
+  console.log('Task stopped successfully');
+}
+```
+
+## Error Handling
+
+All methods return an `ApiResponse` object with the following structure:
+
+```typescript
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  total?: number;
+  page?: number;
+  limit?: number;
+}
+```
+
+Example error handling:
+
+```typescript
+try {
+  const result = await browserable.createTask({
+    task: 'find the top trending GitHub repos of the day.'
+  });
+
+  if (!result.success) {
+    console.error('Failed to create task:', result.error);
+    return;
+  }
+
+  // Process successful result
+  const taskId = result.data.taskId;
+} catch (error) {
+  console.error('An error occurred:', error);
+}
+```
+
+## Best Practices
+
+1. **Task Description**: Write clear, specific task descriptions
+2. **Status Monitoring**: Regularly check task status for long-running tasks
+3. **Error Handling**: Always handle errors and edge cases
+4. **Resource Management**: Stop unused tasks to free up resources
+5. **Pagination**: Use pagination for listing tasks and runs to manage large datasets 

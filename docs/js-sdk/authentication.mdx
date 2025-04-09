@@ -1,0 +1,44 @@
+---
+title: 'Authentication'
+---
+
+TheSDK uses API keys for authentication. You can obtain your API key from the [Browserable Cloud Dashboard](https://app.browserable.ai) or from your local admin dashboard (http://localhost:2001/dash/@admin/settings).
+
+
+## Setting Up Authentication
+
+When initializing the SDK, provide your API key in the constructor:
+
+```typescript
+import { Browserable } from 'browserable-js';
+
+const browserable = new Browserable({
+  apiKey: 'your-api-key'
+});
+```
+
+## Custom Base URL
+
+By default, the SDK uses `https://api.browserable.ai/api/v1` as the base URL. If you need to use a different base URL (for example, in development or testing), you can specify it in the constructor:
+
+```typescript
+const browserable = new Browserable({
+  apiKey: 'your-api-key',
+  baseURL: 'https://custom-api.example.com/api/v1'
+});
+```
+
+## Verifying Authentication
+
+You can verify that your API key is valid by using the `check()` method:
+
+```typescript
+try {
+  const result = await browserable.check();
+  if (result.success) {
+    console.log('API key is valid!');
+  }
+} catch (error) {
+  console.error('Failed to validate API key:', error);
+}
+```

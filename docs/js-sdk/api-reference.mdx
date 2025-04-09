@@ -1,0 +1,237 @@
+---
+title: 'API Reference'
+description: 'Complete API reference for the Browserable JavaScript SDK'
+---
+
+## Class: Browserable
+
+The main SDK class that provides access to all Browserable functionality.
+
+### Constructor
+
+```typescript
+constructor(config: BrowserableConfig)
+```
+
+#### Parameters
+
+```typescript
+interface BrowserableConfig {
+  apiKey: string;
+  baseURL?: string;
+}
+```
+
+- `apiKey` (required): Your Browserable API key
+- `baseURL` (optional): Override the default API base URL
+
+## Task Methods
+
+### createTask
+
+Create a new automated browser task.
+
+```typescript
+async createTask(options: CreateTaskOptions): Promise<ApiResponse<{ taskId: string }>>
+```
+
+#### Parameters
+
+```typescript
+interface CreateTaskOptions {
+  task: string;
+  agents?: string[];
+  triggers?: string[];
+}
+```
+
+- `task`: Natural language description of what you want to automate
+- `agents`: Array of agent types (defaults to `['BROWSER_AGENT']`)
+- `triggers`: Array of trigger conditions (defaults to `['once|0|']`)
+
+### listTasks
+
+List all tasks for the authenticated user.
+
+```typescript
+async listTasks(options?: PaginationOptions): Promise<ApiResponse<Task[]>>
+```
+
+#### Parameters
+
+```typescript
+interface PaginationOptions {
+  page?: number;
+  limit?: number;
+}
+
+interface Task {
+  id: string;
+  status: 'active' | 'inactive';
+  readable_name: string;
+}
+```
+
+### listTaskRuns
+
+List all runs for a specific task.
+
+```typescript
+async listTaskRuns(taskId: string, options?: PaginationOptions): Promise<ApiResponse<TaskRun[]>>
+```
+
+#### Parameters
+
+```typescript
+interface TaskRun {
+  id: string;
+  created_at: string;
+}
+```
+
+### getTaskRunStatus
+
+Get the status of a specific task run.
+
+```typescript
+async getTaskRunStatus(taskId: string, runId?: string): Promise<ApiResponse<TaskRunStatus>>
+```
+
+#### Response Type
+
+```typescript
+interface TaskRunStatus {
+  status: 'scheduled' | 'running' | 'completed' | 'error';
+  detailedStatus?: string;
+  inputWait?: any;
+  liveStatus?: any;
+}
+```
+
+### getTaskRunResult
+
+Get the results of a specific task run.
+
+```typescript
+async getTaskRunResult(taskId: string, runId?: string): Promise<ApiResponse<TaskRunResult>>
+```
+
+#### Response Type
+
+```typescript
+interface TaskRunResult {
+  status: 'scheduled' | 'running' | 'completed' | 'error';
+  error?: string;
+  output?: any;
+  dataTable?: any[];
+}
+```
+
+### stopTaskRun
+
+Stop a running task execution.
+
+```typescript
+async stopTaskRun(taskId: string, runId?: string): Promise<ApiResponse<void>>
+```
+
+### stopTask
+
+Stop a task from running future executions.
+
+```typescript
+async stopTask(taskId: string): Promise<ApiResponse<void>>
+```
+
+### waitForRun
+
+Wait for a task run to complete or error out, with status monitoring.
+
+```typescript
+async waitForRun(
+  taskId: string,
+  runId?: string,
+  options?: WaitForRunOptions
+): Promise<ApiResponse<TaskRunResult>>
+```
+
+#### Parameters
+
+```typescript
+interface WaitForRunOptions {
+  /**
+   * Interval in milliseconds between status checks
+   * @default 1000
+   */
+  pollInterval?: number;
+
+  /**
+   * Maximum time in milliseconds to wait for completion
+   * @default 300000 (5 minutes)
+   */
+  timeout?: number;
+
+  /**
+   * Callback function that will be called on every status change
+   */
+  onStatusChange?: (status: TaskRunStatus) => void;
+}
+```
+
+- `taskId` (required): The ID of the task to monitor
+- `runId` (optional): The specific run ID to monitor. If not provided, monitors the most recent run
+- `options` (optional): Configuration options for the wait operation
+  - `pollInterval`: Time in milliseconds between status checks (default: 1000ms)
+  - `timeout`: Maximum time to wait in milliseconds (default: 5 minutes)
+  - `onStatusChange`: Callback function for status updates
+
+This method will continuously poll the task status until one of the following occurs:
+- The task completes successfully (returns the result)
+- The task errors out (returns the error result)
+- The timeout is reached (throws an error)
+- A network or other error occurs (throws an error)
+
+### check
+
+Verify if your API key is valid.
+
+```typescript
+async check(): Promise<ApiResponse<'ok'>>
+```
+
+## Common Types
+
+### ApiResponse
+
+All methods return a Promise that resolves to an `ApiResponse` object:
+
+```typescript
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  total?: number;
+  page?: number;
+  limit?: number;
+}
+```
+
+## Error Handling
+
+All methods can throw errors in case of network issues or invalid parameters. Always wrap API calls in try-catch blocks:
+
+```typescript
+try {
+  const result = await browserable.createTask({
+    task: 'find the top trending GitHub repos of the day.'
+  });
+  // Handle success
+} catch (error) {
+  // Handle error
+  console.error('API error:', error);
+}
+```
+
+## Rate Limits
+
+The SDK respects the API rate limits. When limits are exceeded, the API will return an error response. Implement appropriate retry logic in your application if needed. 

@@ -1,0 +1,43 @@
+{
+  "name": "browserable",
+  "version": "1.0.10",
+  "description": "CLI tool to setup and run Browserable",
+  "main": "index.js",
+  "bin": {
+    "browserable": "index.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "browserable",
+    "cli",
+    "docker",
+    "development",
+    "setup"
+  ],
+  "author": "Browserable Team",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/browserable/browserable.git"
+  },
+  "bugs": {
+    "url": "https://github.com/browserable/browserable/issues"
+  },
+  "homepage": "https://github.com/browserable/browserable#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=14"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^11.1.0",
+    "execa": "^8.0.1",
+    "inquirer": "^9.2.12",
+    "open": "^10.1.0",
+    "ora": "^5.4.1"
+  }
+}

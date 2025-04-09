@@ -1,0 +1,103 @@
+---
+title: 'Quickstart'
+description: 'Broswerable- open source JS browser automation library for AI agents'
+---
+
+## Easy setup
+
+### Install Browserable
+
+```javascript
+npx browserable
+```
+
+### Follow the instructions
+
+The script will ensure you have the required dependencies (Docker), clones the Browserable repo and starts the containers.
+
+<img class="border-2" src="/images/browserable-quickstart.png" />
+
+## Manual setup
+
+### Clone the Browserable repo.
+
+```bash
+git clone https://github.com/browserable/browserable.git
+cd browserable
+```
+
+### Ensure you have Docker and Docker Compose installed in your system.
+
+```bash
+docker --version
+docker-compose --version
+```
+
+Follow the links below for installation instructions:
+- Docker: https://docs.docker.com/engine/install/
+- Docker Compose: https://docs.docker.com/compose/install/
+
+### Start the development environment.
+
+Once the installation is complete, change directory to deployment folder inside the browserable repo and start the docker containers.
+
+```bash
+cd deployment
+docker-compose -f docker-compose.dev.yml up
+```
+
+If everything goes as expected, you should find the following services running:
+
+- UI Server (http://localhost:2001)
+- Documentation (http://localhost:2002)
+- Tasks Server (http://localhost:2003)
+- MongoDB (port 27017)
+- MongoDB Express UI (http://localhost:3300)
+- Redis (port 6379)
+- Steel browser (port 3000)
+- MinIO Object Storage:
+  - API (http://localhost:9000)
+  - Console (http://localhost:9001)
+- Supabase Services:
+  - Studio (http://localhost:8000)
+  - Database (port 5432)
+
+## Quickstart
+
+1. Open http://localhost:2001 and set your LLM API key. 
+2. Now you can create new tasks from the UI.
+3. To use Browserable library in your projects, you can access API key from the settings tab.
+
+## Where next?
+
+<CardGroup>
+
+<Card title="Join Our Discord" icon="discord" href="https://discord.gg/b6s9fXNjeQ">
+  Stuck? Have any questions? Or share your feedback. Join our community on Discord.
+</Card>
+
+<Card
+  title="Customize Agent"
+  icon="square-code"
+  href="/guides/admin/api-keys"
+>
+  Learn how to customize and extend the agent.
+</Card>
+
+<Card
+  title="REST API"
+  icon="terminal"
+  href="/rest-api/introductions"
+>
+  Explore the Browserable REST API to integrate the agent into your products.
+</Card>
+
+<Card
+  title="JS SDK"
+  icon="js"
+  href="/js-sdk/introduction"
+>
+  Explore our JS SDK to seamless integrate Browserable into your JS projects.
+</Card>
+
+</CardGroup>

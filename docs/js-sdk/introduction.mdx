@@ -1,0 +1,106 @@
+---
+title: 'Introduction'
+description: 'JavaScript SDK for seamless integration with Browserable'
+---
+
+# Browserable JavaScript SDK
+
+The Browserable JavaScript SDK provides a type-safe wrapper around our REST API, making it easy to integrate Browserable's browser automation capabilities into your JavaScript/TypeScript applications.
+
+## Installation
+
+Install the SDK using npm:
+
+```bash
+npm install browserable-js
+```
+
+Or using yarn:
+
+```bash
+yarn add browserable-js
+```
+
+## Quick Start
+
+Here's a simple example to get you started:
+
+```typescript
+import { Browserable } from 'browserable-js';
+
+// Initialize the SDK
+const browserable = new Browserable({
+  apiKey: 'your-api-key'
+});
+
+// Create and run a task
+async function runTask() {
+  // Create a new task
+  const createResult = await browserable.createTask({
+    task: 'find the top trending GitHub repos of the day.',
+    agents: ['BROWSER_AGENT']
+  });
+
+  if (!createResult.success || !createResult.data) {
+    console.error('Failed to create task:', createResult.error);
+    return;
+  }
+
+  const taskId = createResult.data.taskId;
+
+  // Wait for task completion with status updates
+  try {
+    const result = await browserable.waitForRun(taskId, undefined, {
+      // Optional: customize polling interval (default: 1000ms)
+      pollInterval: 2000,
+      // Optional: customize timeout (default: 5 minutes)
+      timeout: 600000, // 10 minutes
+      // Optional: handle status updates
+      onStatusChange: (status) => {
+        console.log('Current status:', status.status);
+        if (status.liveStatus) {
+          console.log('Live status:', status.liveStatus);
+        }
+      }
+    });
+
+    if (result.success && result.data) {
+      console.log('Task completed successfully!');
+      console.log('Results:', result.data);
+    }
+  } catch (error) {
+    if (error.message.includes('Timeout')) {
+      console.error('Task took too long to complete');
+    } else {
+      console.error('Error while waiting for task:', error);
+    }
+  }
+}
+
+runTask().catch(console.error);
+```
+
+## Features
+
+- **Type Safety**: Built with TypeScript for excellent IDE support and type checking
+- **Promise-based API**: Modern async/await interface for all operations
+- **Error Handling**: Consistent error handling with typed responses
+- **Pagination Support**: Built-in support for paginated endpoints
+- **Configurable**: Customizable base URL and request options
+- **Task Monitoring**: Built-in support for waiting and monitoring task completion
+
+## Next Steps
+
+- Check out the [Authentication](/js-sdk/authentication) guide to get started
+- Learn about [Task Management](/js-sdk/tasks) operations
+- Explore the [API Reference](/js-sdk/api-reference) for detailed documentation
+
+## Stay Updated
+
+Want to know when the JS SDK is released or have specific feature requests? Join our community:
+
+- Join our [Discord community](https://discord.com/invite/b6s9fXNjeQ) to discuss your requirements
+- Share what features you'd like to see in the SDK
+- Get notified when the SDK is released
+
+We value your input and would love to hear about your specific use cases to ensure our SDK meets your needs. 

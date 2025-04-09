@@ -1,0 +1,39 @@
+---
+title: "Stop Task"
+openapi: "PUT /task/{taskId}/stop"
+description: "Stop a task from running future executions"
+---
+
+### Headers
+
+<ParamField header="x-api-key" type="string" required>
+  Your API key for authentication
+</ParamField>
+
+### URL Parameters
+
+<ParamField path="taskId" type="string" required>
+  The ID of the task to stop
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<RequestExample>
+```bash
+curl --request PUT \
+  --url 'http://localhost:2003/api/v1/task/task_123/stop' \
+  --header 'x-api-key: <your-api-key>'
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "success": true
+}
+```
+</ResponseExample> 

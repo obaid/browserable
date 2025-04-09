@@ -1,0 +1,74 @@
+---
+title: "List Task Runs"
+openapi: "GET /task/{taskId}/runs"
+description: "Get a list of all runs for a specific task"
+---
+
+### Headers
+
+<ParamField header="x-api-key" type="string" required>
+  Your API key for authentication
+</ParamField>
+
+### URL Parameters
+
+<ParamField path="taskId" type="string" required>
+  The ID of the task
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="page" type="number" default="1">
+  Page number for pagination
+</ParamField>
+
+<ParamField query="limit" type="number" default="30">
+  Number of runs per page (max: 30)
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="data" type="array">
+  Array of run objects
+</ResponseField>
+
+<ResponseField name="total" type="number">
+  Total number of runs
+</ResponseField>
+
+<ResponseField name="page" type="number">
+  Current page number
+</ResponseField>
+
+<ResponseField name="limit" type="number">
+  Number of runs per page
+</ResponseField>
+
+<RequestExample>
+```bash
+curl --request GET \
+  --url 'http://localhost:2003/api/v1/task/task_123/runs?page=1&limit=30' \
+  --header 'x-api-key: <your-api-key>'
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "run_456",
+      "created_at": "2024-03-20T15:30:00Z"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "limit": 30
+}
+```
+</ResponseExample> 

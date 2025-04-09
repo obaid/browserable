@@ -1,0 +1,73 @@
+---
+title: "Get Task Run Status"
+openapi: "GET /task/{taskId}/run/status"
+description: "Get the status of a specific task run"
+---
+
+### Headers
+
+<ParamField header="x-api-key" type="string" required>
+  Your API key for authentication
+</ParamField>
+
+### URL Parameters
+
+<ParamField path="taskId" type="string" required>
+  The ID of the task
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="runId" type="string">
+  The ID of the run. If not provided, returns status of the most recent run.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  <Expandable title="Properties">
+    <ResponseField name="status" type="string">
+      High-level status: "scheduled", "running", "completed", or "error"
+    </ResponseField>
+    
+    <ResponseField name="detailedStatus" type="string">
+      Detailed status information about the current state
+    </ResponseField>
+    
+    <ResponseField name="inputWait" type="object">
+      Information about any user input being waited on
+    </ResponseField>
+    
+    <ResponseField name="liveStatus" type="object">
+      Real-time status information about the current operation
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+```bash
+curl --request GET \
+  --url 'http://localhost:2003/api/v1/task/task_123/run/status?runId=run_456' \
+  --header 'x-api-key: <your-api-key>'
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "success": true,
+  "data": {
+    "status": "running",
+    "detailedStatus": "processing_page",
+    "inputWait": null,
+    "liveStatus": {
+      "message": "Analyzing webpage content"
+    }
+  }
+}
+```
+</ResponseExample> 

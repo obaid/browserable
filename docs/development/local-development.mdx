@@ -1,0 +1,112 @@
+---
+title: 'Local Development'
+description: 'Set up Browserable locally for development'
+---
+
+## Prerequisites
+
+Before you begin, make sure you have the following installed on your system:
+
+- [Git](https://git-scm.com/)
+- [Docker](https://www.docker.com/get-started)
+- [Docker Compose](https://docs.docker.com/compose/install/) (usually comes with Docker Desktop)
+
+## Getting Started
+
+### Clone the Repository
+
+First, clone the Browserable repository from GitHub:
+
+```bash
+git clone https://github.com/browserable/browserable.git
+cd browserable
+```
+
+### Start the Development Environment
+
+The development environment is containerized using Docker Compose. To start all services:
+
+```bash
+docker compose -f deployment/docker-compose.dev.yml up
+```
+
+This will start all the required services including:
+
+- UI Server (http://localhost:2001)
+- Tasks Server (http://localhost:2003)
+- MongoDB (port 27017)
+- MongoDB Express UI (http://localhost:3300)
+- Redis (port 6379)
+- MinIO Object Storage:
+  - API (http://localhost:9000)
+  - Console (http://localhost:9001)
+- Supabase Services:
+  - Studio (http://localhost:8082)
+  - Database (port 5432)
+  - Other supabase services
+- Docs (http://localhost:2002)
+
+### Available Interfaces
+
+Once the development environment is up and running, you can access these interfaces:
+
+1. **Main Application UI**
+   - URL: http://localhost:2001
+   - The main Browserable user interface
+
+2. **Tasks Server**
+   - URL: http://localhost:2003
+   - Handles background tasks and browser automation
+
+3. **MongoDB Express**
+   - URL: http://localhost:3300
+   - Username: admin
+   - Password: pass
+   - Web interface for managing MongoDB data
+
+4. **MinIO Console**
+   - URL: http://localhost:9001
+   - Username: browserable-storage
+   - Password: secret1234
+   - Object storage management interface
+
+5. **Supabase Studio**
+   - URL: http://localhost:8082
+   - Database management and API explorer
+
+## Development Workflow
+
+The development environment is set up with hot-reloading enabled. Any changes you make to the source files will automatically trigger a rebuild of the affected components.
+
+### Project Structure
+
+- `ui/` - Frontend React application
+- `tasks/` - Backend services and task management
+- `deployment/` - Docker and deployment configurations
+- `docs/` - Documentation files
+
+## Getting Help
+
+If you need assistance or want to stay updated with the latest features:
+
+- Join our [Discord community](https://discord.gg/b6s9fXNjeQ)
+- Report issues on our [GitHub repository](https://github.com/browserable/browserable)
+- Get real-time help from other developers
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Ports Already in Use**
+   - Make sure no other services are running on the required ports
+   - You can modify the port mappings in `docker-compose.dev.yml` if needed
+
+2. **Docker Services Not Starting**
+   - Check Docker logs: `docker compose -f deployment/docker-compose.dev.yml logs`
+   - Ensure Docker has enough resources allocated
+
+3. **Database Connection Issues**
+   - Verify that the database container is healthy: `docker ps`
+   - Check the database logs: `docker compose -f deployment/docker-compose.dev.yml logs db`
+
+For any other issues or questions, please reach out to our [Discord community](https://discord.gg/b6s9fXNjeQ). We're here to help! 
