@@ -2,7 +2,8 @@
 
 [Website](https://browserable.ai) | [Documentation](https://docs.browserable.ai) | [Discord](https://discord.gg/b6s9fXNjeQ) | [Twitter](https://x.com/browserable)
 
-![Browserable Logo](https://github.com/browserable/browserable/blob/main/docs/browserable-ai.png?raw=true)
+![Browserable Logo](https://github.com/browserable/browserable/blob/main/docs/browserable-ai-invert.png?#gh-dark-mode-only)
+![Browserable Logo](https://github.com/browserable/browserable/blob/main/docs/browserable-ai.png?#gh-light-mode-only)
 
 ## Open source browser automation library for AI agents
 </div>
