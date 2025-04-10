@@ -104,7 +104,7 @@ Task: On amazon.com search for a yoga mat at least 6mm thick, non-slip, eco-frie
 <br><br>
 Task: On arxiv.org locate the latest paper within the 'Nonlinear Sciences - Chaotic Dynamics' category, summarize the abstract, and note the submission date.
 
-![arxiv-demo](https://github.com/user-attachments/assets/c8340bad-0331-44a8-b14a-42c9abe8ae21)
+![arxiv-demo](https://github.com/user-attachments/assets/c5e5a830-5050-4938-9832-2d2207c2720f)
 
 <br><br>
 Task: On coursera.com find a beginner-level online course about '3d printing' which lasts 1-3 months, and is provided by a renowned university.
