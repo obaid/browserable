@@ -17,7 +17,8 @@ function buildDecideActionPrompt({
     userName,
     timezoneOffsetInSeconds,
     customInstructions,
-    input
+    input,
+    dtSchema,
 }) {
     return `
 === AGENT DESCRIPTION ===
@@ -27,6 +28,9 @@ ${customInstructions || ""}
 
 === TASK TO ACHIEVE OVERALL ===
 ${input}
+
+=== DATA TABLE SCHEMA OF WHAT SCHEMA USER IS EXPECTING THE INFORMATION IN ===
+${JSON.stringify(dtSchema, null, 2)}
 
 ${shortlistedDocuments.length == 0 ? "" : `
 === SHORTLISTED DOCUMENTS WITH RELEVANT DATA FOR THIS TASK ===

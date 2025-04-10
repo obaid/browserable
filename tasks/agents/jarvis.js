@@ -346,7 +346,6 @@ async function updateRunKeyVal({ runId, data }) {
 // schedule a looper for a node
 async function scheduleNodeLooper({
     runId,
-    input,
     threadId,
     nodeId,
     delay,
@@ -363,6 +362,13 @@ async function scheduleNodeLooper({
         const userId = run.user_id;
         const flowId = run.flow_id;
         const accountId = run.account_id;
+
+        // get the input of the node 
+        const { rows: nodes } = await tasksDB.query(
+            `SELECT input FROM browserable.nodes WHERE id = $1`,
+            [nodeId]
+        );
+        const input = nodes[0].input;
 
         const agent = agentMap[agentCode];
         await agent._looper({
@@ -1976,6 +1982,12 @@ async function decideAction({
         });
     }
 
+    // get the dtSchema
+    const dtSchema = await getDataTableSchema({
+        flowId: runs[0].flow_id,
+        accountId: runs[0].account_id,
+    });
+
     const agent = agentMap[agentCode];
 
     const prompt = jarvisPrompts.buildDecideActionPrompt({
@@ -1989,6 +2001,7 @@ async function decideAction({
         timezoneOffsetInSeconds,
         customInstructions,
         input,
+        dtSchema,
     });
 
     const response = await callOpenAICompatibleLLMWithRetry({
@@ -2186,32 +2199,6 @@ async function decideTaskDataTableOps({
         });
     }
 
-    if (singleThreadMode) {
-        // In single thread mode, each run adds one single new row to the results table.
-        return {
-            success: true,
-            actionCode: "decided_to_add_or_update_rows",
-            data: {
-                rows: [
-                    {
-                        ...(dtSchema.length > 0
-                            ? dtSchema
-                                  .map(({ key }) => ({
-                                      [key]: "",
-                                  }))
-                                  .reduce(
-                                      (acc, curr) => ({ ...acc, ...curr }),
-                                      {}
-                                  )
-                            : {}),
-                        subTask: `${task}
-${triggerInput ? `Trigger input: ${triggerInput}` : ""}`,
-                    },
-                ],
-            },
-        };
-    }
-
     await updateNodeUserLog({
         runId,
         threadId,
@@ -2239,6 +2226,7 @@ ${triggerInput ? `Trigger input: ${triggerInput}` : ""}`,
         timezoneOffsetInSeconds,
         availableAgentsString,
         parentNodeStructuredOutput,
+        singleThreadMode,
     });
 
     const response = await callOpenAICompatibleLLMWithRetry({
