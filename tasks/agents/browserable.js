@@ -27,7 +27,6 @@ const textSchema = z.object({
 
 const HEURISTIC_CHAR_WIDTH = 5;
 
-
 async function ensureWebviewJSInjected(page) {
     const isInjected = await page.evaluate(() => {
         return window.webviewJSInjected === true;
@@ -2014,8 +2013,6 @@ function DocToMD(doc) {
 // console.log("webview.js loaded");
 
 `;
-
-
 
 async function getTabIdOfPage(page) {
     try {
@@ -4392,7 +4389,6 @@ async function waitForSettledDom(page) {
     }
 }
 
-
 function fillInVariables(text, variables) {
     let processedText = text;
     Object.entries(variables).forEach(([key, value]) => {
@@ -4415,32 +4411,32 @@ class BrowserableAgent extends BaseAgent {
             browser = data.browser;
             context = data.context;
         }
-    
+
         const page = await context.newPage();
-    
+
         try {
             // add http:// or https:// if not present
             if (!url.startsWith("http://") && !url.startsWith("https://")) {
                 url = "http://" + url;
             }
-    
+
             // Navigate to the URL and wait for it to load
             await page.goto(url, { waitUntil: "domcontentloaded" });
         } catch (error) {
             console.error("Error opening new tab:", error);
         }
-    
+
         // Ensure the page is fully loaded before calling getBrowserTabsAndMetaInformation
         await waitForSettledDom(page);
-    
+
         // Small delay to stabilize the execution context
         await new Promise((resolve) => setTimeout(resolve, 1000));
-    
+
         // Get tabs info
         const tabsInfo = await getBrowserTabsAndMetaInformation({
             context,
         });
-    
+
         return {
             tabsInfo,
             newUrl: page.url(),
@@ -4453,26 +4449,26 @@ class BrowserableAgent extends BaseAgent {
             sessionId,
             connectUrl,
         });
-    
+
         const { tabs, tabsString } = await getBrowserTabsAndMetaInformation({
             context,
         });
-    
+
         const tab = tabs.find((tab) => tab.tabId === tabId);
         if (!tab) {
             throw new Error(
                 `Tab with ID ${tabId} not found. Current tabs: ${tabsString}`
             );
         }
-    
+
         const page = await context.pages()[tabId];
-    
+
         const pageHtml = await page.evaluate(() => {
             return globalThis.document.documentElement.outerHTML;
         });
-    
+
         const markdown = NodeHtmlMarkdown.translate(pageHtml);
-    
+
         return {
             markdown,
             tabsInfo: {
@@ -4481,7 +4477,6 @@ class BrowserableAgent extends BaseAgent {
             },
         };
     }
-
 
     constructor() {
         super();
@@ -5141,7 +5136,6 @@ ONLY OUTPUT THE JSON. NO OTHER TEXT.`,
         const nodeInfo = await jarvis.getNodeInfo({ runId, nodeId });
 
         const { sessionId, connectUrl } = nodeInfo.private_data;
-
 
         const { url } = aiData;
 
@@ -5948,10 +5942,11 @@ ${extractedContent}`,
 
             const { sessionId, connectUrl } = nodeInfo.private_data;
 
-            const { browser, context } = await browserService.getPlaywrightBrowser({
-                sessionId,
-                connectUrl,
-            });
+            const { browser, context } =
+                await browserService.getPlaywrightBrowser({
+                    sessionId,
+                    connectUrl,
+                });
 
             const { tabs, tabsString } = await getBrowserTabsAndMetaInformation(
                 {

@@ -15,6 +15,8 @@ RULES:
 - For each element in the output, you need to generate the output/result based on the messages. Stick to the format of the element mentioned.
 - For markdown elements, you need to generate the markdown based on the messages. Make sure the markdown is formatted correctly. When in doubt, include more details rather than less.
 - Focus on the task and the description of the element to understand that the value of the element should be.
+- CRITICAL: When a field has a specified word limit (e.g., '100 words max'), you MUST stay under that limit. Count the words before finalizing your response."
+- ALSO THE OVERALL OUTPUT MUST NOT EXCEED 4000 WORDS. MAKE SURE TO STAY UNDER THAT LIMIT SO THAT THE FINAL OUTPUT IS A PROPERLY STRUCTURED JSON OBJECT.
 `,
         },
         {
@@ -67,6 +69,8 @@ FORMAT: JSON OBJECT WITH ONLY ONE KEY "outputGenerated"
         }
     ]
 }
+IMPORTANT: If the description specifies a word limit (e.g., '100 words max'), count your words and ensure you stay under that limit.
+IMPORTANT: The overall output must not exceed 4000 words. Make sure to stay under that limit so that the final output is a properly structured JSON object.
 ONLY PRINT THE JSON OBJECT AND NOTHING ELSE.
 ****************OUTPUT****************
 `,

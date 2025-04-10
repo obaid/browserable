@@ -146,7 +146,7 @@ async function main() {
   console.log(chalk.blue('\nYou can access admin ui at: http://localhost:2001'));
   console.log(chalk.blue('\nYou can access the documentation at: http://localhost:2002'));
   console.log(chalk.blue('\nYou can access the api at: http://localhost:2003'));
-  console.log(chalk.blue('\nYou can access supabase studio at: http://localhost:8000'));
+  console.log(chalk.blue('\nYou can access database studio at: http://localhost:8000'));
   console.log(chalk.blue('\nYou can access mongo express at: http://localhost:3300'));
   console.log(chalk.blue('\nYou can access minio S3 storage at: http://localhost:9001'));
   console.log(chalk.blue('\nYou can access redis queue system at: http://localhost:2003/admin/queues'));

@@ -66,6 +66,7 @@ flowQueue.process("task-creator-job", async (job, done) => {
 
         const schemaPrompt = buildDataTableSchemaPrompt({
             task,
+            mandatoryColumns: metadata.mandatoryColumns || [],
             userName: userName,
             timezoneOffsetInSeconds: timezoneOffsetInSeconds,
         });
@@ -762,7 +763,7 @@ THE OBJECT MUST NOT HAVE ANY NESTED VALUES. ALL VALUES MUST BE STRING (CAN BE MA
             "qwen-plus",
         ],
         max_attempts: 5,
-        max_tokens: 3000,
+        max_tokens: 4000,
         metadata: {
             runId,
             flowId: runs[0]?.flow_id,
@@ -948,63 +949,64 @@ async function detailedOutputHelper({
     while (!completed) {
         let currentChunks = [];
         let currentChunkTokens = 0;
-        while (currentChunkTokens < maxTokens && messages.length > 0) {
-            const message = messages.pop();
-            if (
-                Array.isArray(message.content) &&
-                message.content.length > 0 &&
-                message.content[0].type === "image_url"
-            ) {
-                // skip image urls
-                continue;
-            } else {
-                if (!message.content) {
+        
+        // Handle case with no messages by running at least once
+        if (messages.length === 0) {
+            completed = true;
+        } else {
+            while (currentChunkTokens < maxTokens && messages.length > 0) {
+                const message = messages.pop();
+                if (
+                    Array.isArray(message.content) &&
+                    message.content.length > 0 &&
+                    message.content[0].type === "image_url"
+                ) {
+                    // skip image urls
                     continue;
-                }
-                let content =
-                    typeof message.content === "string"
-                        ? message.content
-                        : Array.isArray(message.content)
-                        ? message.content
-                              .map((c) =>
-                                  typeof c === "string"
-                                      ? c
-                                      : c.text
-                                      ? c.text
-                                      : c.markdown
-                                      ? c.markdown
-                                      : ""
-                              )
-                              .join("")
-                        : typeof message.content === "object"
-                        ? message.content.text
-                            ? message.content.text
-                            : message.content.markdown
-                            ? message.content.markdown
-                            : ""
-                        : "";
-                // trim content to max 3000 words
-                content = content.split(" ").slice(0, 3000).join(" ");
-                const tokens = encode(content).length;
-                if (currentChunkTokens + tokens <= maxTokens) {
-                    currentChunks.push({
-                        role:
-                            message.role === "user" ||
-                            message.role === "assistant"
-                                ? message.role
-                                : "user",
-                        content: content,
-                    });
-                    currentChunkTokens += tokens;
                 } else {
-                    break;
+                    if (!message.content) {
+                        continue;
+                    }
+                    let content =
+                        typeof message.content === "string"
+                            ? message.content
+                            : Array.isArray(message.content)
+                            ? message.content
+                                  .map((c) =>
+                                      typeof c === "string"
+                                          ? c
+                                          : c.text
+                                          ? c.text
+                                          : c.markdown
+                                          ? c.markdown
+                                          : ""
+                                  )
+                                  .join("")
+                            : typeof message.content === "object"
+                            ? message.content.text
+                                ? message.content.text
+                                : message.content.markdown
+                                ? message.content.markdown
+                                : ""
+                            : "";
+                    // trim content to max 3000 words
+                    content = content.split(" ").slice(0, 3000).join(" ");
+                    const tokens = encode(content).length;
+                    if (currentChunkTokens + tokens <= maxTokens) {
+                        currentChunks.push({
+                            role:
+                                message.role === "user" ||
+                                message.role === "assistant"
+                                    ? message.role
+                                    : "user",
+                            content: content,
+                        });
+                        currentChunkTokens += tokens;
+                    } else {
+                        break;
+                    }
                 }
             }
-        }
-
-        if (currentChunks.length === 0) {
-            completed = true;
-            break;
         }
 
         updateRunStatus({
@@ -1033,7 +1035,7 @@ async function detailedOutputHelper({
                 "claude-3-5-haiku",
                 "qwen-plus",
             ],
-            max_tokens: 3000,
+            max_tokens: 4000,
             metadata: {
                 runId,
                 nodeId,
@@ -1048,7 +1050,9 @@ async function detailedOutputHelper({
 
         if (
             !outputGenerated ||
-            (outputGenerated.filter((x) => !(x.value === undefined) && !(x.value === "")).length === 0 &&
+            (outputGenerated.filter(
+                (x) => !(x.value === undefined) && !(x.value === "")
+            ).length === 0 &&
                 attempt < 2)
         ) {
             // give one more shot at this
@@ -1064,6 +1068,10 @@ async function detailedOutputHelper({
                 outputData,
                 output,
             });
+        }
+
+        if (messages.length === 0) {
+            completed = true;
         }
     }
 
@@ -1191,7 +1199,7 @@ async function createUpdatesToDocuments({
             "gpt-4o-mini",
             "claude-3-5-haiku",
         ],
-        max_tokens: 3000,
+        max_tokens: 4000,
         metadata: {
             runId,
             nodeId,
@@ -1235,6 +1243,7 @@ async function createDetailedOutputForNode({
     input,
     output,
     outputData,
+    useHistory,
 }) {
     const tasksDB = await db.getTasksDB();
 
@@ -1249,9 +1258,11 @@ async function createDetailedOutputForNode({
 
     let messages = [];
 
-    for (const node of nodes) {
-        for (const message of node.messages) {
-            messages.push(message);
+    if (useHistory) {
+        for (const node of nodes) {
+            for (const message of node.messages) {
+                messages.push(message);
+            }
         }
     }
 

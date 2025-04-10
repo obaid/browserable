@@ -136,8 +136,6 @@ class DeepResearchAgent extends BaseAgent {
                 threadId,
             });
 
-            console.log("CHECKPOINT 3");
-
             await jarvis.updateNodeUserLog({
                 runId,
                 nodeId,
@@ -164,8 +162,6 @@ class DeepResearchAgent extends BaseAgent {
                     },
                 ],
             });
-
-            console.log("CHECKPOINT 4");
 
             await jarvis.updateNodeDebugLog({
                 runId,
@@ -200,7 +196,6 @@ class DeepResearchAgent extends BaseAgent {
 
             // for each serp,
             for (const serpQuery of serpQueries) {
-                console.log("CHECKPOINT 6");
                 await jarvis.updateNodeStatus({
                     agentCode: this.CODE,
                     runId,
@@ -341,8 +336,6 @@ ${followupQuestions.join("\n")}`;
 
             // in case there are no more jobs, then we move to the next step
             if (data.jobs.length === 0 && newJobs.length === 0) {
-                console.log("CHECKPOINT 8");
-
                 await jarvis.scheduleQueueJob({
                     code: this.CODE,
                     functionToCall: "generateDeepResearchReport",
@@ -363,7 +356,8 @@ ${followupQuestions.join("\n")}`;
                 }
             }
         } catch (error) {
-            console.log("CHECKPOINT 7", error);
+
+            console.log("Error in deep research", error);
 
             await jarvis.updateNodeStatus({
                 agentCode: this.CODE,

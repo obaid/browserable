@@ -58,7 +58,7 @@ Once running, you'll have access to the following services:
 | Redis | 6379 | Caching and queues |
 | MinIO API | http://localhost:9000 | Object storage API |
 | MinIO Console | http://localhost:9001 | Object storage UI |
-| Supabase Studio | http://localhost:8000 | Database management |
+| DB Studio | http://localhost:8000 | Database management |
 
 ## JavaScript SDK
 

@@ -179,6 +179,19 @@ ONLY output the JSON, nothing else.`,
 
             const task = initMessage;
 
+            let mandatoryColumnsInResultsTable = [];
+
+            if (agent_codes.includes("DEEPRESEARCH_AGENT")) {
+                mandatoryColumnsInResultsTable = [
+                    {
+                        key: "deepResearchReport",
+                        name: "DeepResearch Report",
+                        type: "string",
+                        description: "Detailed report of the deepresearch agent in markdown format",
+                    },
+                ];
+            }
+
             const { flowId } = await createFlow({
                 flow: {
                     account_id: accountId,
@@ -196,6 +209,7 @@ ONLY output the JSON, nothing else.`,
                         readableDescriptionOfTriggers:
                             triggersResponse?.readableDescriptionOfTriggers ||
                             "",
+                        mandatoryColumns: mandatoryColumnsInResultsTable,
                     },
                 },
             });

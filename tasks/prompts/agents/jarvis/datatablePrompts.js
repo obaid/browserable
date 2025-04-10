@@ -9,6 +9,7 @@ function buildDataTableSystemPrompt({ userName, timezoneOffsetInSeconds }) {
 function buildDataTableSchemaPrompt({
     task,
     userName,
+    mandatoryColumns,
     timezoneOffsetInSeconds,
 }) {
     return `
@@ -27,6 +28,15 @@ function buildDataTableSchemaPrompt({
 
     === YOUR TASK ===
     Given this task, if we have to inform user after performing this task, what should the columns be and for each column what should the data be?
+
+    ${
+        mandatoryColumns && mandatoryColumns.length > 0
+            ? `
+    === MANDATORY COLUMNS USER HAS ASKED FOR. MAKE SURE TO INCLUDE ALL OF THEM IN THE OUTPUT ===
+    ${JSON.stringify(mandatoryColumns, null, 2)}
+    `
+            : ""
+    }
 
     === OUTPUT FORMAT JSON ===
     {
@@ -100,7 +110,11 @@ Once you have some critical information (like the names/identifiers of the items
 ${availableAgentsString}
 
 ===HERE'S WHAT WE WE LEARNT FROM THE MOST RECENT AGENT===
-${parentNodeStructuredOutput ? JSON.stringify(parentNodeStructuredOutput, null, 2) : "No parent node structured output found"}
+${
+    parentNodeStructuredOutput
+        ? JSON.stringify(parentNodeStructuredOutput, null, 2)
+        : "No parent node structured output found"
+}
 
 ===PREVIOUS ATTEMPTS===
 ${logs

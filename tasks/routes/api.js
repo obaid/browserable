@@ -49,7 +49,7 @@ const validateApiKey = async (req, res, next) => {
 
 // Create task
 router.post("/task/create", cors(), validateApiKey, async (req, res) => {
-    const { task, agents = ["BROWSER_AGENT"], triggers } = req.body;
+    const { task, agents = ["BROWSER_AGENT"], triggers, mandatoryColumns } = req.body;
 
     if (!task) {
         return res.json({ success: false, error: "Task is required" });
@@ -159,6 +159,21 @@ ONLY output the JSON, nothing else.`,
             readableDescriptionOfTriggers = "Run once immediately.";
         }
 
+        let mandatoryColumnsInResultsTable = [];
+
+        if (mandatoryColumns) {
+            mandatoryColumnsInResultsTable = mandatoryColumns;
+        } else if (agents.includes("DEEPRESEARCH_AGENT")) {
+            mandatoryColumnsInResultsTable = [
+                {
+                    key: "deepResearchReport",
+                    name: "DeepResearch Report",
+                    type: "string",
+                    description: "Detailed report of the deepresearch agent in markdown format",
+                },
+            ];
+        }
+
         const { flowId } = await createFlow({
             flow: {
                 account_id: req.account_id,
@@ -174,6 +189,7 @@ ONLY output the JSON, nothing else.`,
                     agent_codes: agents,
                     initMessage: task,
                     readableDescriptionOfTriggers,
+                    mandatoryColumns: mandatoryColumnsInResultsTable,
                 },
             },
         });

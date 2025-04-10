@@ -62,6 +62,7 @@ class BrowserService {
                       steelAPIKey: process.env.STEEL_API_KEY || steelApiKey,
                   })
                 : null;
+        this.steelApiKey = process.env.STEEL_API_KEY || steelApiKey;
 
         this.provider = this.playwrightClient
             ? "playwright"
@@ -251,8 +252,8 @@ class BrowserService {
                 connectUrl: session.websocketUrl,
                 liveUrl: session.debugUrl,
                 running: session.status === "live",
-                wsEndpoint: process.env.STEEL_API_KEY
-                    ? `wss://connect.steel.dev?apiKey=${process.env.STEEL_API_KEY}&sessionId=${sessionId}`
+                wsEndpoint: this.steelApiKey
+                    ? `wss://connect.steel.dev?apiKey=${this.steelApiKey}&sessionId=${sessionId}`
                     : `${session.websocketUrl}`,
                 // wsEndpoint: process.env.STEEL_API_KEY
                 //     ? `wss://connect.steel.dev?apiKey=${process.env.STEEL_API_KEY}&sessionId=${sessionId}`
@@ -414,6 +415,7 @@ class BrowserService {
                       steelAPIKey: process.env.STEEL_API_KEY || steelApiKey,
                   })
                 : null;
+        this.steelApiKey = process.env.STEEL_API_KEY || steelApiKey;
 
         this.provider = this.playwrightClient
             ? "playwright"

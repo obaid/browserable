@@ -1364,49 +1364,6 @@ async function communicateInformationToUserAtRun({
     });
 }
 
-async function createNewFlow({
-    runId,
-    readable_name,
-    readable_description,
-    task,
-    triggers,
-    summary,
-    agent_codes,
-    user_id,
-    account_id,
-}) {
-    await communicateInformationToUserAtRun({
-        runId,
-        information: summary,
-    });
-
-    // get flow id of the runId
-    const tasksDB = await db.getTasksDB();
-    const { rows: runs } = await tasksDB.query(
-        `SELECT flow_id FROM browserable.runs WHERE id = $1`,
-        [runId]
-    );
-    const flowId = runs[0].flow_id;
-
-    // Now we need to create the flow in the database
-    const {} = await createFlow({
-        flow: {
-            user_id,
-            account_id,
-            runId,
-            readable_name,
-            readable_description,
-            task,
-            triggers,
-            metadata: {
-                summary,
-                agent_codes,
-            },
-        },
-        generatorFlowId: flowId,
-    });
-}
-
 async function communicateInformationToUserAtNode({
     runId,
     nodeId,
@@ -1783,6 +1740,7 @@ async function endNodeWorker({
         outputData: shortlistedOutputData,
         output,
         userId: run.user_id,
+        useHistory: !report
     });
 
     if (!structuredOutput || !structuredOutput.length) {
@@ -2112,6 +2070,7 @@ async function decideTaskDataTableOps({
     timezoneOffsetInSeconds,
     availableAgentsString,
     parentNodeStructuredOutput = null,
+    singleThreadMode = true,
 }) {
     if (attempt > 5) {
         await updateNodeUserLog({
@@ -2227,6 +2186,32 @@ async function decideTaskDataTableOps({
         });
     }
 
+    if (singleThreadMode) {
+        // In single thread mode, each run adds one single new row to the results table.
+        return {
+            success: true,
+            actionCode: "decided_to_add_or_update_rows",
+            data: {
+                rows: [
+                    {
+                        ...(dtSchema.length > 0
+                            ? dtSchema
+                                  .map(({ key }) => ({
+                                      [key]: "",
+                                  }))
+                                  .reduce(
+                                      (acc, curr) => ({ ...acc, ...curr }),
+                                      {}
+                                  )
+                            : {}),
+                        subTask: `${task}
+${triggerInput ? `Trigger input: ${triggerInput}` : ""}`,
+                    },
+                ],
+            },
+        };
+    }
+
     await updateNodeUserLog({
         runId,
         threadId,
@@ -2270,7 +2255,7 @@ async function decideTaskDataTableOps({
             "claude-3-5-haiku",
             "qwen-plus",
         ],
-        max_tokens: 3000,
+        max_tokens: 4000,
         metadata: {
             runId,
             nodeId,
@@ -2356,6 +2341,7 @@ async function decideTaskDataTableOps({
             timezoneOffsetInSeconds,
             availableAgentsString,
             parentNodeStructuredOutput,
+            singleThreadMode,
         });
     } else if (actionCode === "work_on_subtask_before_deciding") {
         return {
@@ -2482,6 +2468,18 @@ async function decideAgent({ runId, preferredNodeId }) {
         ) {
             return;
         }
+
+        // get the flow metadata
+        let flowMetadata = {};
+        const { rows: flowMetadataRows } = await tasksDB.query(
+            `SELECT metadata FROM browserable.flows WHERE id = $1`,
+            [run.flow_id]
+        );
+        if (flowMetadataRows.length > 0) {
+            flowMetadata = flowMetadataRows[0].metadata;
+        }
+
+        const singleThreadMode = !flowMetadata.allowMultipleThreads;
 
         // in users table there will be a settings column. settings.timezoneOffsetInSeconds is what we need
         const { rows: users } = await tasksDB.query(
@@ -3061,6 +3059,7 @@ ${JSON.stringify(aiData, null, 2)}
                         timezoneOffsetInSeconds,
                         availableAgentsString,
                         parentNodeStructuredOutput,
+                        singleThreadMode,
                     });
 
                 if (!success) {
@@ -4220,7 +4219,6 @@ const jarvis = {
     getNodeInfo,
     saveNodePrivateData,
     getActionsAndEvents,
-    createNewFlow,
     getAvailableAgentsForUser,
     updateRunAgentLog,
     getNodeAgentLog,

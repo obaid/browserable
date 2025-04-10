@@ -22,6 +22,7 @@ JSON string:
 ${text}
 
 OUTPUT: (JSON ONLY)
+ONLY PRINT THE JSON OBJECT AND NOTHING ELSE. PLEASE DO NOT PRINT ANYTHING ELSE.
 `,
             },
         ],
@@ -348,7 +349,7 @@ async function callOpenAICompatibleLLM({
                 await tasksDB.query(
                     `UPDATE browserable.llm_calls SET response = $1::json, completed_at = $2 WHERE id = $3`,
                     [
-                        JSON.stringify({ error: fixError.message }),
+                        JSON.stringify({ error: fixError.message, originalResponse: res.data.choices[0].message.content }),
                         new Date(),
                         callId,
                     ]
