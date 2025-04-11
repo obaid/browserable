@@ -79,14 +79,9 @@ async function searchAndScrape({
 
             scrapedPageContent = `
 ------
-MARKDOWN
+HTML
 -------
-${gSearchResults?.data?.markdown || ""}
-
-------
-LINKS
--------
-${JSON.stringify(gSearchResults?.data?.links || [], null, 2)}
+${gSearchResults?.data?.html || ""}
 `;
 
             // trim the scrapedPageContent to 60000 characters
@@ -140,7 +135,7 @@ ${JSON.stringify(gSearchResults?.data?.links || [], null, 2)}
                     const scrapeResult = await browserService.scrape({
                         url: link,
                         onlyMainContent: true,
-                        formats: ["markdown"],
+                        formats: ["markdown", "links"],
                     });
 
                     // console.log("scrapeResult", scrapeResult, link);
@@ -156,7 +151,9 @@ ${JSON.stringify(gSearchResults?.data?.links || [], null, 2)}
             })
         );
 
-        scrapedLinks = scrapedLinks.filter((link) => link !== null);
+        scrapedLinks = scrapedLinks.filter(
+            (data) => !!data && data.content && data.content.trim().length > 0
+        );
 
         let scrapedContent = "";
 
@@ -196,6 +193,9 @@ ${JSON.stringify(gSearchResults?.data?.links || [], null, 2)}
             urls: scrapedLinks.map((link) => link.url),
             learnings,
             followupQuestions,
+            searchPageContent: scrapedPageContent,
+            searchPageResults: results,
+            scrapedLinks,
         };
     } catch (err) {
         console.log("Error searching and scraping", err);

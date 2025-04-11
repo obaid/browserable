@@ -24,7 +24,7 @@ const browserable = new Browserable({
 const createTask = async () => {
   const result = await browserable.createTask({
     task: 'Visit example.com and extract all links',
-    agents: ['BROWSER_AGENT'], // Optional
+    agent: 'BROWSER_AGENT', // Optional
     triggers: ['once|0|'] // Optional
   });
   console.log('Task created:', result.data?.taskId);

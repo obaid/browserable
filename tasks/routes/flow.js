@@ -2,10 +2,7 @@ var express = require("express");
 var router = express.Router();
 var cors = require("cors");
 var { getReadableFromUTCToLocal } = require("../utils/datetime");
-var {
-    createFlow,
-    changeFlowStatus,
-} = require("../logic/flow");
+var { createFlow, changeFlowStatus } = require("../logic/flow");
 var {
     callOpenAICompatibleLLMWithRetry,
     updateMetadataOfLLMCall,
@@ -30,7 +27,6 @@ const {
     addUserToRequest,
 } = require("../logic/middleware");
 
-
 // create an api to generate otp
 router.options(
     "/create/generator",
@@ -48,15 +44,20 @@ router.post(
     addUserToRequest,
     checkAccountAccess,
     async (req, res) => {
-        const { fingerprint, initMessage, agent_codes, accountId } =
-            req.body || {};
+        const {
+            fingerprint,
+            initMessage,
+            agent = "BROWSER_AGENT",
+            accountId,
+        } = req.body || {};
 
         try {
             let user = req.user;
 
             const uniqueKeyInMetadata = "generator";
             const uniqueValInMetadata = Date.now();
-            const timezoneOffsetInSeconds = user?.settings?.timezoneOffsetInSeconds || 0;
+            const timezoneOffsetInSeconds =
+                user?.settings?.timezoneOffsetInSeconds || 0;
 
             const llmResponse = await callOpenAICompatibleLLMWithRetry({
                 messages: [
@@ -117,28 +118,24 @@ Available triggers are:
 - Or they didn't mention any other trigger at all.
 2. "crontab|<crontab_string>|" ---> creates a task with the crontab string to run as long as it is active
 - Use this if the user asked to run something repeatedly at some specific time/day/routine
-3. event.once|<event_id>|" ---> integrations can parse this event id to create a run. (event_id options are available in action details of the agents)
-- Use this if there's a specific available trigger below & user mentioned to run it once when that trigger is triggered next
-4. event.every|<event_id>|" ---> integrations can parse this event id to create a run. 
-- Use this if there's a specific available trigger below & user mentioned to run it repeatedly everytime the event is triggered
 
 It's mandatory to have at least one trigger. Worst case, you can use "once|0|" as a trigger.
 
 
 Available triggers for the task:
 ${getAvailableTriggers({
-    agent_codes: agent_codes || [],
+    agent_codes: [agent],
 })}
 
 Current date and time at user's timezone: ${getReadableFromUTCToLocal(
-    new Date(),
-    timezoneOffsetInSeconds
-)}
+                            new Date(),
+                            timezoneOffsetInSeconds
+                        )}
 
 Current data and time at server's timezone: ${getReadableFromUTCToLocal(
-    new Date(),
-    0
-)}
+                            new Date(),
+                            0
+                        )}
 
 Timezone:
 Server is at UTC timezone.
@@ -165,7 +162,7 @@ ONLY output the JSON, nothing else.`,
                     "deepseek-reasoner",
                     "claude-3-5-sonnet",
                     "gpt-4o",
-                    "qwen-plus",        
+                    "qwen-plus",
                 ],
                 metadata: {
                     [uniqueKeyInMetadata]: uniqueValInMetadata,
@@ -179,19 +176,6 @@ ONLY output the JSON, nothing else.`,
 
             const task = initMessage;
 
-            let mandatoryColumnsInResultsTable = [];
-
-            if (agent_codes.includes("DEEPRESEARCH_AGENT")) {
-                mandatoryColumnsInResultsTable = [
-                    {
-                        key: "deepResearchReport",
-                        name: "DeepResearch Report",
-                        type: "string",
-                        description: "Detailed report of the deepresearch agent in markdown format",
-                    },
-                ];
-            }
-
             const { flowId } = await createFlow({
                 flow: {
                     account_id: accountId,
@@ -204,12 +188,11 @@ ONLY output the JSON, nothing else.`,
                     data: {},
                     status: "active",
                     metadata: {
-                        agent_codes,
+                        agent_codes: [agent],
                         initMessage,
                         readableDescriptionOfTriggers:
                             triggersResponse?.readableDescriptionOfTriggers ||
                             "",
-                        mandatoryColumns: mandatoryColumnsInResultsTable,
                     },
                 },
             });
@@ -414,10 +397,8 @@ router.post(
             accountId,
         } = req.body || {};
 
-
         try {
             let user = req.user;
-
 
             before = before || Date.now();
             before = new Date(before);
@@ -475,7 +456,6 @@ router.post(
             accountId,
         } = req.body || {};
 
-
         try {
             let user = req.user;
 
@@ -522,7 +502,7 @@ router.post(
         credentials: true,
         origin: process.env.CORS_DOMAINS.split(","),
     }),
-    addUserToRequest,   
+    addUserToRequest,
     checkAccountAccess,
     async (req, res) => {
         let { flowId: flow_id, accountId } = req.body || {};
@@ -565,7 +545,6 @@ router.post(
     checkAccountAccess,
     async (req, res) => {
         const { flowId: flow_id, accountId } = req.body || {};
-
 
         try {
             let user = req.user;
@@ -653,13 +632,7 @@ router.post(
     addUserToRequest,
     checkAccountAccess,
     async (req, res) => {
-        let {
-            flowId: flow_id,
-            before,
-            limit = 50,
-            accountId,
-        } = req.body || {};
-
+        let { flowId: flow_id, before, limit = 50, accountId } = req.body || {};
 
         try {
             let user = req.user;
@@ -726,13 +699,7 @@ router.post(
     addUserToRequest,
     checkAccountAccess,
     async (req, res) => {
-        let {
-            flowId: flow_id,
-            after,
-            limit = 50,
-            accountId,
-        } = req.body || {};
-
+        let { flowId: flow_id, after, limit = 50, accountId } = req.body || {};
 
         try {
             let user = req.user;
@@ -873,7 +840,10 @@ router.post(
             );
 
             if (rows.length === 0) {
-                res.json({ success: false, error: "No flow found or unauthorized" });
+                res.json({
+                    success: false,
+                    error: "No flow found or unauthorized",
+                });
                 return;
             }
 
@@ -909,7 +879,12 @@ router.post(
     addUserToRequest,
     checkAccountAdminAccess,
     async (req, res) => {
-        let { pageSize = 50, pageNumber = 1, flowId, accountId } = req.body || {};
+        let {
+            pageSize = 50,
+            pageNumber = 1,
+            flowId,
+            accountId,
+        } = req.body || {};
 
         try {
             let user = req.user;
@@ -939,7 +914,7 @@ router.post(
                     ORDER BY created_at DESC
                     LIMIT $3 OFFSET $4`,
                     [accountId, flowId, pageSize, offset]
-                )
+                ),
             ]);
 
             const totalCount = parseInt(countResult.rows[0].count);
@@ -951,8 +926,8 @@ router.post(
                     totalCount,
                     pageSize,
                     pageNumber,
-                    totalPages: Math.ceil(totalCount / pageSize)
-                }
+                    totalPages: Math.ceil(totalCount / pageSize),
+                },
             });
         } catch (e) {
             console.log(e);
@@ -977,7 +952,13 @@ router.post(
     addUserToRequest,
     checkAccountAccess,
     async (req, res) => {
-        let { pageSize = 50, pageNumber = 1, flowId, accountId, userId } = req.body || {};
+        let {
+            pageSize = 50,
+            pageNumber = 1,
+            flowId,
+            accountId,
+            userId,
+        } = req.body || {};
 
         try {
             // Ensure positive integers
@@ -999,7 +980,10 @@ router.post(
                 userId,
             });
 
-            res.json({ success: true, data: { documents, total, schema, pageSize, pageNumber } });
+            res.json({
+                success: true,
+                data: { documents, total, schema, pageSize, pageNumber },
+            });
         } catch (e) {
             console.log(e);
             res.json({ success: false, error: e.message });
@@ -1023,14 +1007,22 @@ router.post(
     addUserToRequest,
     checkAccountAccess,
     async (req, res) => {
-        let { flowId, pageSize = 50, pageNumber = 1, sortOrder = 'DESC', accountId } = req.body || {};
+        let {
+            flowId,
+            pageSize = 50,
+            pageNumber = 1,
+            sortOrder = "DESC",
+            accountId,
+        } = req.body || {};
 
         try {
             // Ensure positive integers and validate inputs
             pageSize = Math.max(1, Math.floor(Number(pageSize)));
             pageNumber = Math.max(1, Math.floor(Number(pageNumber)));
             pageSize = Math.min(50, pageSize);
-            sortOrder = ['ASC', 'DESC'].includes(sortOrder) ? sortOrder : 'DESC';
+            sortOrder = ["ASC", "DESC"].includes(sortOrder)
+                ? sortOrder
+                : "DESC";
 
             const offset = (pageNumber - 1) * pageSize;
 
@@ -1051,7 +1043,7 @@ router.post(
                     ORDER BY created_at ${sortOrder}
                     LIMIT $3 OFFSET $4`,
                     [flowId, accountId, pageSize, offset]
-                )
+                ),
             ]);
 
             const totalCount = parseInt(countResult.rows[0].count);
@@ -1063,8 +1055,8 @@ router.post(
                     totalCount,
                     pageSize,
                     pageNumber,
-                    totalPages: Math.ceil(totalCount / pageSize)
-                }
+                    totalPages: Math.ceil(totalCount / pageSize),
+                },
             });
         } catch (e) {
             console.log(e);
@@ -1114,7 +1106,7 @@ router.post(
                     `SELECT * FROM browserable.runs 
                     WHERE id = $1`,
                     [runId]
-                )
+                ),
             ]);
 
             res.json({
@@ -1122,8 +1114,8 @@ router.post(
                 data: {
                     nodes: nodesResult.rows,
                     threads: threadsResult.rows,
-                    run: runResult.rows[0]
-                }
+                    run: runResult.rows[0],
+                },
             });
         } catch (e) {
             console.log(e);
@@ -1131,6 +1123,5 @@ router.post(
         }
     }
 );
-
 
 module.exports = router;

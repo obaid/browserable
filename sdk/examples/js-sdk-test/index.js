@@ -2,7 +2,7 @@ import { Browserable } from 'browserable-js';
 
 // Initialize the SDK
 const browserable = new Browserable({
-  apiKey: 'c201d91c07316560630a5e6f4e6506b028472b6a2053ffcaa5c9b987129b3457',
+  apiKey: '43c42f35b0b6b3b30fdfd2fcf07ba7fdf179f5831207153448b77c9eee99711d',
   baseURL: 'http://localhost:2003/api/v1'
 });
 
@@ -11,7 +11,7 @@ async function runTask() {
   // Create a new task
   const createResult = await browserable.createTask({
     task: 'find the top trending GitHub repos of the day.',
-    agents: ['BROWSER_AGENT']
+    agent: 'BROWSER_AGENT'
   });
 
   if (!createResult.success || !createResult.data) {

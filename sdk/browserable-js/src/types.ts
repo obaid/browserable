@@ -5,7 +5,7 @@ export interface BrowserableConfig {
 
 export interface CreateTaskOptions {
   task: string;
-  agents?: string[];
+  agent?: string;
   triggers?: string[];
 }
 

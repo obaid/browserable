@@ -31,6 +31,7 @@ import LLMCallsView from '../components/LLMCallsView';
 import DataTableView from '../components/DataTableView';
 import ProjectView from '../components/ProjectView';
 import FlowChartView from '../components/FlowChartView';
+import ReportView from '../components/ReportView';
 
 const axiosInstance = axios.create({
   timeout: 50000,
@@ -628,9 +629,14 @@ function Flow(props) {
     />
   );
 
+  console.log("flowDetails", flowDetails);
+
   const llmtab = <LLMCallsView flowId={flowId} />;
   const dataTableTab = <DataTableView flowId={flowId} />;
   const flowChartTab = <FlowChartView flowId={flowId} />;
+  const reportTab = <ReportView flowId={flowId} />;
+
+  const isDeepResearchAgent = flowDetails?.data?.metadata?.agent_codes?.includes("DEEPRESEARCH_AGENT");
 
   const tabs = isAdmin
     ? [
@@ -654,6 +660,11 @@ function Flow(props) {
           label: "Results Table",
           component: dataTableTab,
         },
+        ...(isDeepResearchAgent ? [{
+          id: "report",
+          label: "Report",
+          component: reportTab,
+        }] : []),
       ]
     : [
         {
@@ -666,6 +677,11 @@ function Flow(props) {
           label: "Results Table",
           component: dataTableTab,
         },
+        ...(isDeepResearchAgent ? [{
+          id: "report",
+          label: "Report",
+          component: reportTab,
+        }] : []),
       ];
 
   if (token) {

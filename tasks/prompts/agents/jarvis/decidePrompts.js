@@ -182,20 +182,6 @@ ${JSON.stringify(availableAgents[agentCode].DETAILS.input, null, 2)}
     )
     .join("\n\n")}
 
-Output for all agents: (outputData parameters)
-- Array of objects
-- Each object has the following keys:
--- key: <unique key for the output>
--- readableName: <readable name for this key of the output>
--- type: <type of the output. string, number, boolean, markdown>
--- description: <markdown formatted description of the detailed output you want from the agent for this key.>
-
-RULE: there must be one key mandatory in outputData array for all agents. 
-key: "report"
-readableName: "Report"
-type: "markdown"
-description: "Detailed findings of the agent in markdown format. Can be 1000+ words. Maintain a record of all the steps and decisions made by the agent related to the task. Make sure to include all the fields user mentioned in the task. There's no way report can be empty."
-
 === END OF POSSIBLE AGENTS ===
 
 == GENERIC AGENT CODES ==
@@ -246,9 +232,6 @@ OUTPUT: (JSON)
         <for the task key, make sure the input is structured and includes ALL possible information that the agent would require. For ex: assume the agent does not have access to original task. Your input is THE ONLY information the agent would act upon. (IMPORTANT)>
         // Note that the keys here are directly the nodes inside input.parameters. Don't start with parameters again.
     },
-    "outputData": <array of objects> [{ // include this for only agent codes that are not "end" or "error" 
-        <keys here are the keys of the output data. values are the values to be passed to the agent for that key.> // each agent will try to generate this output data.
-    }...],
     "reasoningForPickingAgent": "<reasoningForPickingAgent> string,
     "summaryOfEverythingHappenedSoFar": "<summaryOfEverythingHappenedSoFar> string. Include all the details that the next agent can use to complete the task. This is important.",
 }

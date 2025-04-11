@@ -72,7 +72,7 @@ function Dash(props) {
           accountId,
           fingerprint,
           initMessage: story,
-          agent_codes: [selectedNonGenerativeAgent, "GENERATIVE_AGENT"],
+          agent: selectedNonGenerativeAgent,
         },
       }
     );

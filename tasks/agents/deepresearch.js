@@ -193,7 +193,6 @@ class DeepResearchAgent extends BaseAgent {
             let newJobs = [];
             let learningsTrailMap = {};
 
-
             // for each serp,
             for (const serpQuery of serpQueries) {
                 await jarvis.updateNodeStatus({
@@ -203,10 +202,10 @@ class DeepResearchAgent extends BaseAgent {
                     status: `Researching "${serpQuery.query}"`,
                 });
 
-                const { urls, learnings, followupQuestions } =
+                const { urls, learnings, followupQuestions, searchPageContent, searchPageResults, scrapedLinks } =
                     await searchAndScrape({
                         query: serpQuery.query,
-                        maxUrls: 8,
+                        maxUrls: 10,
                         runId,
                         nodeId,
                         flowId: jarvis.flow_id,
@@ -262,8 +261,25 @@ class DeepResearchAgent extends BaseAgent {
                                         },
                                         {
                                             type: "markdown",
-                                            markdown: learnings.join("\n"),
+                                            markdown: learnings
+                                                .map((x) => `- ${x}`)
+                                                .join("\n"),
                                             name: "Learnings",
+                                        },
+                                        {
+                                            type: "markdown",
+                                            markdown: searchPageContent,
+                                            name: "Search page content",
+                                        },
+                                        {
+                                            type: "code",
+                                            code: searchPageResults,
+                                            name: "Search page results",
+                                        },
+                                        {
+                                            type: "code",
+                                            code: scrapedLinks,
+                                            name: "Scraped links",
                                         },
                                     ],
                                 },
@@ -356,7 +372,6 @@ ${followupQuestions.join("\n")}`;
                 }
             }
         } catch (error) {
-
             console.log("Error in deep research", error);
 
             await jarvis.updateNodeStatus({
@@ -402,9 +417,14 @@ ${followupQuestions.join("\n")}`;
         }
     }
 
-    async generateDeepResearchReport({ runId, nodeId, superTask, jarvis, threadId }) {
+    async generateDeepResearchReport({
+        runId,
+        nodeId,
+        superTask,
+        jarvis,
+        threadId,
+    }) {
         try {
-
             await jarvis.updateNodeStatus({
                 agentCode: this.CODE,
                 runId,
@@ -412,30 +432,26 @@ ${followupQuestions.join("\n")}`;
                 status: "Generating deep research report",
             });
 
-
             let { private_data: data } = await jarvis.getNodeInfo({
                 runId,
                 nodeId,
             });
             data = data || {};
 
-
             // Use the detailed report helper here
-            let detailedOutput =
-                await jarvis.createDetailedOutputWithMessages({
-                    messages: (data.learnings || []).map((learning) => ({
-                        role: "assistant",
-                        content: learning,
-                    })),
-                    runId,
-                    nodeId,
-                    flowId: jarvis.flow_id,
-                    input: superTask,
-                    userId: jarvis.user_id,
-                    accountId: jarvis.account_id,
-                    threadId,
-                });
-
+            let detailedOutput = await jarvis.createDetailedOutputWithMessages({
+                messages: (data.learnings || []).map((learning) => ({
+                    role: "assistant",
+                    content: learning,
+                })),
+                runId,
+                nodeId,
+                flowId: jarvis.flow_id,
+                input: superTask,
+                userId: jarvis.user_id,
+                accountId: jarvis.account_id,
+                threadId,
+            });
 
             await jarvis.updateNodeStatus({
                 agentCode: this.CODE,
@@ -444,7 +460,7 @@ ${followupQuestions.join("\n")}`;
                 status: "Deep research report generated",
             });
 
-            detailedOutput = detailedOutput.find(x => x.key === "report")?.value || "";
+            detailedOutput = detailedOutput.report;
 
             const sources = data.urls;
             // list the sources at the end of the report in a list format
@@ -510,12 +526,16 @@ ${followupQuestions.join("\n")}`;
                                     },
                                     {
                                         type: "markdown",
-                                        markdown: data.learnings.map(x => `- ${x}`).join("\n"),
+                                        markdown: data.learnings
+                                            .map((x) => `- ${x}`)
+                                            .join("\n"),
                                         name: "Learnings",
                                     },
                                     {
                                         type: "markdown",
-                                        markdown: data.urls.map(x => `- ${x}`).join("\n"),
+                                        markdown: data.urls
+                                            .map((x) => `- ${x}`)
+                                            .join("\n"),
                                         name: "URLs",
                                     },
                                 ],
@@ -525,6 +545,27 @@ ${followupQuestions.join("\n")}`;
                 ],
             });
 
+            // now lets get the schema of the data table
+            const dtSchema = await jarvis.getDataTableSchema({
+                flowId: jarvis.flow_id,
+                accountId: jarvis.account_id,
+            });
+
+            // we create one new entry which is exactly in the format of the data table scheme
+            let newRow = {};
+
+            for (const row of dtSchema) {
+                newRow[row.key] = "";
+            }
+
+            // for the entry in the newRow with key "report", we add the detailedOutput
+            // for the entry in the newRow with key "sources", we add the sourcesList
+            // for the entry in the newRow with key "learnings", we add the learnings
+
+            newRow.report = detailedOutput;
+            newRow.sources = sourcesList;
+            newRow.learnings = data.learnings.map((x) => `- ${x}`).join("\n");
+
             // Now we end the node
             await jarvis.endNode({
                 runId,
@@ -532,7 +573,7 @@ ${followupQuestions.join("\n")}`;
                 status: "completed",
                 output: reportWithSources,
                 reasoning: "Deep research report generated",
-                report: reportWithSources,
+                schemaStructuredOutput: [newRow],
                 threadId,
             });
         } catch (err) {

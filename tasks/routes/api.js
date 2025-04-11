@@ -49,7 +49,7 @@ const validateApiKey = async (req, res, next) => {
 
 // Create task
 router.post("/task/create", cors(), validateApiKey, async (req, res) => {
-    const { task, agents = ["BROWSER_AGENT"], triggers, mandatoryColumns } = req.body;
+    const { task, agent = "BROWSER_AGENT", triggers } = req.body;
 
     if (!task) {
         return res.json({ success: false, error: "Task is required" });
@@ -123,7 +123,7 @@ It's mandatory to have at least one trigger. Worst case, you can use "once|0|" a
 
 Available triggers for the task:
 ${getAvailableTriggers({
-    agent_codes: agents || [],
+    agent_codes: [agent],
 })}
 
 Output format: (JSON)
@@ -159,21 +159,6 @@ ONLY output the JSON, nothing else.`,
             readableDescriptionOfTriggers = "Run once immediately.";
         }
 
-        let mandatoryColumnsInResultsTable = [];
-
-        if (mandatoryColumns) {
-            mandatoryColumnsInResultsTable = mandatoryColumns;
-        } else if (agents.includes("DEEPRESEARCH_AGENT")) {
-            mandatoryColumnsInResultsTable = [
-                {
-                    key: "deepResearchReport",
-                    name: "DeepResearch Report",
-                    type: "string",
-                    description: "Detailed report of the deepresearch agent in markdown format",
-                },
-            ];
-        }
-
         const { flowId } = await createFlow({
             flow: {
                 account_id: req.account_id,
@@ -186,10 +171,9 @@ ONLY output the JSON, nothing else.`,
                 data: {},
                 status: "active",
                 metadata: {
-                    agent_codes: agents,
+                    agent_codes: [agent],
                     initMessage: task,
                     readableDescriptionOfTriggers,
-                    mandatoryColumns: mandatoryColumnsInResultsTable,
                 },
             },
         });
@@ -210,29 +194,53 @@ ONLY output the JSON, nothing else.`,
 });
 
 // Get task run status
-router.get("/task/:taskId/run/:runId?/status", cors(), validateApiKey, async (req, res) => {
-    const { taskId } = req.params;
-    const runId = req.params.runId;
+router.get(
+    "/task/:taskId/run/:runId?/status",
+    cors(),
+    validateApiKey,
+    async (req, res) => {
+        const { taskId } = req.params;
+        const runId = req.params.runId;
 
-    if (!taskId) {
-        return res.json({ success: false, error: "Task ID is required" });
-    }
+        if (!taskId) {
+            return res.json({ success: false, error: "Task ID is required" });
+        }
 
-    try {
-        const tasksDB = await db.getTasksDB();
+        try {
+            const tasksDB = await db.getTasksDB();
 
-        // If runId is not provided, get the most recent run
-        let finalRunId = runId;
-        if (!finalRunId) {
-            const { rows: recentRuns } = await tasksDB.query(
-                `SELECT id FROM browserable.runs 
+            // If runId is not provided, get the most recent run
+            let finalRunId = runId;
+            if (!finalRunId) {
+                const { rows: recentRuns } = await tasksDB.query(
+                    `SELECT id FROM browserable.runs 
                 WHERE flow_id = $1 AND account_id = $2 
                 ORDER BY created_at DESC LIMIT 1`,
-                [taskId, req.account_id]
+                    [taskId, req.account_id]
+                );
+                if (recentRuns.length > 0) {
+                    finalRunId = recentRuns[0].id;
+                } else {
+                    return res.json({
+                        success: true,
+                        data: {
+                            status: null,
+                            inputWait: null,
+                            liveStatus: null,
+                        },
+                    });
+                }
+            }
+
+            // Get run status
+            const { rows: runs } = await tasksDB.query(
+                `SELECT status, input_wait, id, live_status, private_data->>'workingOnNodeId' AS working_on_node_id 
+            FROM browserable.runs 
+            WHERE id = $1 AND flow_id = $2 AND account_id = $3`,
+                [finalRunId, taskId, req.account_id]
             );
-            if (recentRuns.length > 0) {
-                finalRunId = recentRuns[0].id;
-            } else {
+
+            if (runs.length === 0) {
                 return res.json({
                     success: true,
                     data: {
@@ -242,109 +250,115 @@ router.get("/task/:taskId/run/:runId?/status", cors(), validateApiKey, async (re
                     },
                 });
             }
-        }
 
-        // Get run status
-        const { rows: runs } = await tasksDB.query(
-            `SELECT status, input_wait, id, live_status, private_data->>'workingOnNodeId' AS working_on_node_id 
-            FROM browserable.runs 
-            WHERE id = $1 AND flow_id = $2 AND account_id = $3`,
-            [finalRunId, taskId, req.account_id]
-        );
+            let runStatus = runs[0].status;
+            let inputWait = runs[0].input_wait;
+            let liveStatus = runs[0].live_status;
+            let runStatusCopy = runStatus;
 
-        if (runs.length === 0) {
-            return res.json({
-                success: true,
-                data: {
-                    status: null,
-                    inputWait: null,
-                    liveStatus: null,
-                },
-            });
-        }
+            if (inputWait) {
+                inputWait.runId = runs[0].id;
+            }
 
-        let runStatus = runs[0].status;
-        let inputWait = runs[0].input_wait;
-        let liveStatus = runs[0].live_status;
-        let runStatusCopy = runStatus;
-
-        if (inputWait) {
-            inputWait.runId = runs[0].id;
-        }
-
-        if (runStatus === "running" && runs[0].working_on_node_id) {
-            const { rows: nodes } = await tasksDB.query(
-                `SELECT status, live_status, input_wait, id 
+            if (runStatus === "running" && runs[0].working_on_node_id) {
+                const { rows: nodes } = await tasksDB.query(
+                    `SELECT status, live_status, input_wait, id 
                 FROM browserable.nodes 
                 WHERE run_id = $1 AND id = $2`,
-                [runs[0].id, runs[0].working_on_node_id]
-            );
+                    [runs[0].id, runs[0].working_on_node_id]
+                );
 
-            if (nodes.length > 0 && nodes[0].live_status) {
-                liveStatus = nodes[0].live_status;
-            }
+                if (nodes.length > 0 && nodes[0].live_status) {
+                    liveStatus = nodes[0].live_status;
+                }
 
-            if (nodes.length > 0 && runStatus !== "ask_user_for_input") {
-                runStatus = nodes[0].status;
+                if (nodes.length > 0 && runStatus !== "ask_user_for_input") {
+                    runStatus = nodes[0].status;
 
-                if (
-                    nodes[0].input_wait &&
-                    nodes[0].status === "ask_user_for_input" &&
-                    nodes[0].input_wait != "completed"
-                ) {
-                    inputWait = nodes[0].input_wait;
-                    inputWait.nodeId = nodes[0].id;
-                    inputWait.runId = runs[0].id;
+                    if (
+                        nodes[0].input_wait &&
+                        nodes[0].status === "ask_user_for_input" &&
+                        nodes[0].input_wait != "completed"
+                    ) {
+                        inputWait = nodes[0].input_wait;
+                        inputWait.nodeId = nodes[0].id;
+                        inputWait.runId = runs[0].id;
+                    }
                 }
             }
-        }
 
-        res.json({
-            success: true,
-            data: {
-                status:
-                    runStatusCopy === "completed"
-                        ? "completed"
-                        : runStatusCopy === "error"
-                        ? "error"
-                        : runStatusCopy === "pending"
-                        ? "scheduled"
-                        : "running",
-                detailedStatus: runStatus,
-                inputWait,
-                liveStatus,
-            },
-        });
-    } catch (e) {
-        console.log(e);
-        res.json({ success: false, error: e.message });
+            res.json({
+                success: true,
+                data: {
+                    status:
+                        runStatusCopy === "completed"
+                            ? "completed"
+                            : runStatusCopy === "error"
+                            ? "error"
+                            : runStatusCopy === "pending"
+                            ? "scheduled"
+                            : "running",
+                    detailedStatus: runStatus,
+                    inputWait,
+                    liveStatus,
+                },
+            });
+        } catch (e) {
+            console.log(e);
+            res.json({ success: false, error: e.message });
+        }
     }
-});
+);
 
 // Get task run result
-router.get("/task/:taskId/run/:runId?/result", cors(), validateApiKey, async (req, res) => {
-    const { taskId } = req.params;
-    const runId = req.params.runId;
+router.get(
+    "/task/:taskId/run/:runId?/result",
+    cors(),
+    validateApiKey,
+    async (req, res) => {
+        const { taskId } = req.params;
+        const runId = req.params.runId;
 
-    if (!taskId) {
-        return res.json({ success: false, error: "Task ID is required" });
-    }
+        if (!taskId) {
+            return res.json({ success: false, error: "Task ID is required" });
+        }
 
-    try {
-        const tasksDB = await db.getTasksDB();
+        try {
+            const tasksDB = await db.getTasksDB();
 
-        // If runId is not provided, get the most recent run
-        let finalRunId = runId;
-        if (!finalRunId) {
-            const { rows: recentRuns } = await tasksDB.query(
-                `SELECT id FROM browserable.runs 
+            // If runId is not provided, get the most recent run
+            let finalRunId = runId;
+            if (!finalRunId) {
+                const { rows: recentRuns } = await tasksDB.query(
+                    `SELECT id FROM browserable.runs 
                 WHERE flow_id = $1 AND account_id = $2 
                 ORDER BY created_at DESC LIMIT 1`,
-                [taskId, req.account_id]
+                    [taskId, req.account_id]
+                );
+                if (recentRuns.length > 0) {
+                    finalRunId = recentRuns[0].id;
+                } else {
+                    return res.json({
+                        success: true,
+                        data: {
+                            status: null,
+                            error: null,
+                            output: null,
+                            dataTable: [],
+                        },
+                    });
+                }
+            }
+
+            // Get run details
+            const { rows: runs } = await tasksDB.query(
+                `SELECT status, error, output 
+            FROM browserable.runs 
+            WHERE id = $1 AND flow_id = $2 AND account_id = $3`,
+                [finalRunId, taskId, req.account_id]
             );
-            if (recentRuns.length > 0) {
-                finalRunId = recentRuns[0].id;
-            } else {
+
+            if (runs.length === 0) {
                 return res.json({
                     success: true,
                     data: {
@@ -355,123 +369,113 @@ router.get("/task/:taskId/run/:runId?/result", cors(), validateApiKey, async (re
                     },
                 });
             }
-        }
 
-        // Get run details
-        const { rows: runs } = await tasksDB.query(
-            `SELECT status, error, output 
-            FROM browserable.runs 
-            WHERE id = $1 AND flow_id = $2 AND account_id = $3`,
-            [finalRunId, taskId, req.account_id]
-        );
+            // Get results table documents
+            const { documents } = await getDocumentsFromDataTable({
+                flowId: taskId,
+                accountId: req.account_id,
+                userId: req.user_id,
+                page: 1,
+                pageSize: 100,
+            });
 
-        if (runs.length === 0) {
-            return res.json({
+            // remove _id, flowId, accountId from documents
+            documents.forEach((document) => {
+                delete document._id;
+                delete document.flowId;
+                delete document.accountId;
+            });
+
+            res.json({
                 success: true,
                 data: {
-                    status: null,
-                    error: null,
-                    output: null,
-                    dataTable: [],
+                    status:
+                        runs[0].status === "pending"
+                            ? "scheduled"
+                            : runs[0].status === "completed"
+                            ? "completed"
+                            : runs[0].status === "error"
+                            ? "error"
+                            : "running",
+                    error: runs[0].error,
+                    output: runs[0].output,
+                    dataTable: documents,
                 },
             });
+        } catch (e) {
+            console.log(e);
+            res.json({ success: false, error: e.message });
         }
-
-        // Get results table documents
-        const { documents } = await getDocumentsFromDataTable({
-            flowId: taskId,
-            accountId: req.account_id,
-            userId: req.user_id,
-            page: 1,
-            pageSize: 100,
-        });
-
-        // remove _id, flowId, accountId from documents
-        documents.forEach((document) => {
-            delete document._id;
-            delete document.flowId;
-            delete document.accountId;
-        });
-
-        res.json({
-            success: true,
-            data: {
-                status:
-                    runs[0].status === "pending"
-                        ? "scheduled"
-                        : runs[0].status === "completed"
-                        ? "completed"
-                        : runs[0].status === "error"
-                        ? "error"
-                        : "running",
-                error: runs[0].error,
-                output: runs[0].output,
-                dataTable: documents,
-            },
-        });
-    } catch (e) {
-        console.log(e);
-        res.json({ success: false, error: e.message });
     }
-});
+);
 
 // Stop a task run
-router.put("/task/:taskId/run/:runId?/stop", cors(), validateApiKey, async (req, res) => {
-    const { taskId } = req.params;
-    let runId = req.params.runId;
+router.put(
+    "/task/:taskId/run/:runId?/stop",
+    cors(),
+    validateApiKey,
+    async (req, res) => {
+        const { taskId } = req.params;
+        let runId = req.params.runId;
 
-    if (!taskId) {
-        return res.json({ success: false, error: "Task ID is required" });
-    }
+        if (!taskId) {
+            return res.json({ success: false, error: "Task ID is required" });
+        }
 
-    try {
-        const tasksDB = await db.getTasksDB();
-        if (!runId) {
-            const { rows: recentRuns } = await tasksDB.query(
-                `SELECT id FROM browserable.runs 
+        try {
+            const tasksDB = await db.getTasksDB();
+            if (!runId) {
+                const { rows: recentRuns } = await tasksDB.query(
+                    `SELECT id FROM browserable.runs 
                 WHERE flow_id = $1 AND account_id = $2 
                 ORDER BY created_at DESC LIMIT 1`,
-                [taskId, req.account_id]
-            );
-            if (recentRuns.length > 0) {
-                runId = recentRuns[0].id;
-            } else {
-                return res.json({ success: false, error: "Run ID is required" });
+                    [taskId, req.account_id]
+                );
+                if (recentRuns.length > 0) {
+                    runId = recentRuns[0].id;
+                } else {
+                    return res.json({
+                        success: false,
+                        error: "Run ID is required",
+                    });
+                }
             }
-        }
 
-        // get the run details
-        const { rows: runs } = await tasksDB.query(
-            `SELECT id, status FROM browserable.runs 
+            // get the run details
+            const { rows: runs } = await tasksDB.query(
+                `SELECT id, status FROM browserable.runs 
             WHERE id = $1 AND flow_id = $2 AND account_id = $3`,
-            [runId, taskId, req.account_id]
-        );
+                [runId, taskId, req.account_id]
+            );
 
-        if (runs.length === 0) {
-            return res.json({ success: false, error: "Run not found" });
+            if (runs.length === 0) {
+                return res.json({ success: false, error: "Run not found" });
+            }
+
+            const run = runs[0];
+
+            if (run.status === "completed" || run.status === "error") {
+                return res.json({
+                    success: false,
+                    error: "Run already completed",
+                });
+            }
+
+            await endRun({
+                runId,
+                userId: req.user_id,
+                accountId: req.account_id,
+                error: "API abort",
+                status: "error",
+            });
+
+            res.json({ success: true });
+        } catch (e) {
+            console.log(e);
+            res.json({ success: false, error: e.message });
         }
-
-        const run = runs[0];
-
-        if (run.status === "completed" || run.status === "error") {
-            return res.json({ success: false, error: "Run already completed" });
-        }
-
-        await endRun({
-            runId,
-            userId: req.user_id,
-            accountId: req.account_id,
-            error: "API abort",
-            status: "error",
-        });
-
-        res.json({ success: true });
-        
-    } catch (e) {
-        console.log(e);
-        res.json({ success: false, error: e.message });
     }
-});
+);
 
 // Get all runs for a task
 router.get("/task/:taskId/runs", cors(), validateApiKey, async (req, res) => {
@@ -499,8 +503,13 @@ router.get("/task/:taskId/runs", cors(), validateApiKey, async (req, res) => {
             [taskId, req.account_id]
         );
 
-        res.json({ success: true, data: runs, total: totalRuns.rows[0].count, page, limit });
-        
+        res.json({
+            success: true,
+            data: runs,
+            total: totalRuns.rows[0].count,
+            page,
+            limit,
+        });
     } catch (e) {
         console.log(e);
         res.json({ success: false, error: e.message });
@@ -528,7 +537,13 @@ router.get("/tasks", cors(), validateApiKey, async (req, res) => {
             [req.account_id]
         );
 
-        res.json({ success: true, data: tasks, total: totalTasks.rows[0].count, page, limit });
+        res.json({
+            success: true,
+            data: tasks,
+            total: totalTasks.rows[0].count,
+            page,
+            limit,
+        });
     } catch (e) {
         console.log(e);
         res.json({ success: false, error: e.message });

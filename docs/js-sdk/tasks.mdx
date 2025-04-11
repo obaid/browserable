@@ -11,7 +11,7 @@ Create a new task using the `createTask` method:
 ```typescript
 const result = await browserable.createTask({
   task: 'find the top trending GitHub repos of the day.',
-  agents: ['BROWSER_AGENT'], // Optional
+  agent: 'BROWSER_AGENT', // Optional
   triggers: ['once|0|'] // Optional
 });
 

@@ -94,13 +94,10 @@
                     "type": "string",
                     "description": "Natural language description of the task to be automated"
                   },
-                  "agents": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "default": ["BROWSER_AGENT"],
-                    "description": "List of agents to use for the task"
+                  "agent": {
+                    "type": "string",
+                    "default": "BROWSER_AGENT",
+                    "description": "Agent to use for the task"
                   },
                   "triggers": {
                     "type": "array",

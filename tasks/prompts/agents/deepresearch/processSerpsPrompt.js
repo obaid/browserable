@@ -2,7 +2,7 @@
 function buildProcessSerpsPrompt({
     query,
     scrapedContent,
-    numLearnings = 6,
+    numLearnings = 8,
     numFollowupQuestions = 3,
 }) {
     const messages = [

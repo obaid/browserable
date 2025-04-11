@@ -38,7 +38,7 @@ async function runTask() {
   // Create a new task
   const createResult = await browserable.createTask({
     task: 'find the top trending GitHub repos of the day.',
-    agents: ['BROWSER_AGENT']
+    agent: 'BROWSER_AGENT'
   });
 
   if (!createResult.success || !createResult.data) {

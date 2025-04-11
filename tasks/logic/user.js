@@ -5,7 +5,6 @@ const { v4: uuidv4 } = require("uuid");
 const { baseQueue } = require("../services/queue");
 const { customDomainSetupEmail } = require("../logic/email");
 const axios = require("axios");
-const hri = require("human-readable-ids").hri;
 
 // add a job that runs every 2 hours and removed old login tokens
 baseQueue.add(

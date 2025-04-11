@@ -58,48 +58,79 @@ flowQueue.process("task-creator-job", async (job, done) => {
         const userName = users[0].name;
 
         const { task, metadata } = flow;
+        const { agent_codes } = metadata;
 
-        const systemPrompt = buildDataTableSystemPrompt({
-            userName: userName,
-            timezoneOffsetInSeconds: timezoneOffsetInSeconds,
-        });
+        let columns = [];
 
-        const schemaPrompt = buildDataTableSchemaPrompt({
-            task,
-            mandatoryColumns: metadata.mandatoryColumns || [],
-            userName: userName,
-            timezoneOffsetInSeconds: timezoneOffsetInSeconds,
-        });
+        console.log("CHECK THIS", agent_codes);
 
-        const response = await callOpenAICompatibleLLMWithRetry({
-            messages: [
+        if (
+            agent_codes &&
+            agent_codes.length > 0 &&
+            agent_codes.includes("DEEPRESEARCH_AGENT")
+        ) {
+            columns = [
                 {
-                    role: "system",
-                    content: systemPrompt,
+                    key: "report",
+                    name: "Report",
+                    type: "string",
+                    description: "Deepresearch report",
                 },
                 {
-                    role: "user",
-                    content: schemaPrompt,
+                    key: "sources",
+                    name: "Sources",
+                    type: "string",
+                    description: "Sources used to generate the report",
                 },
-            ],
-            metadata: {
-                flowId,
-                accountId,
-                userId,
-                usecase: "datatable_schema",
-            },
-            models: [
-                "gemini-2.0-flash",
-                "deepseek-chat",
-                "gpt-4o-mini",
-                "claude-3-5-haiku",
-                "qwen-plus",
-            ],
-            maxTokens: 2000,
-            max_attempts: 4,
-        });
+                {
+                    key: "learnings",
+                    name: "Learnings",
+                    type: "string",
+                    description: "Learnings from the research",
+                },
+            ];
+        } else {
+            const systemPrompt = buildDataTableSystemPrompt({
+                userName: userName,
+                timezoneOffsetInSeconds: timezoneOffsetInSeconds,
+            });
 
-        const { columns } = response;
+            const schemaPrompt = buildDataTableSchemaPrompt({
+                task,
+                userName: userName,
+                timezoneOffsetInSeconds: timezoneOffsetInSeconds,
+            });
+
+            const response = await callOpenAICompatibleLLMWithRetry({
+                messages: [
+                    {
+                        role: "system",
+                        content: systemPrompt,
+                    },
+                    {
+                        role: "user",
+                        content: schemaPrompt,
+                    },
+                ],
+                metadata: {
+                    flowId,
+                    accountId,
+                    userId,
+                    usecase: "datatable_schema",
+                },
+                models: [
+                    "gemini-2.0-flash",
+                    "deepseek-chat",
+                    "gpt-4o-mini",
+                    "claude-3-5-haiku",
+                    "qwen-plus",
+                ],
+                maxTokens: 2000,
+                max_attempts: 4,
+            });
+
+            columns = response.columns;
+        }
 
         // save this in metadata
         metadata.dtSchema = columns;
@@ -932,79 +963,71 @@ async function detailedOutputHelper({
     input,
     outputData,
     output,
+    outputGenerated,
     userId,
     attempt = 0,
 }) {
     // Iteratively go through the messages (with chunking at 10000 tokens) and iteratively call the LLM to get the detailed output and reasoning
-    let outputGenerated = outputData.map((x) => {
-        return {
-            ...x,
-            value: outputData?.[x?.value] || "",
-        };
-    });
     let completed = false;
     let maxTokens = 10000;
-    const tasksDB = await db.getTasksDB();
 
     while (!completed) {
         let currentChunks = [];
         let currentChunkTokens = 0;
-        
-        // Handle case with no messages by running at least once
-        if (messages.length === 0) {
-            completed = true;
-        } else {
-            while (currentChunkTokens < maxTokens && messages.length > 0) {
-                const message = messages.pop();
-                if (
-                    Array.isArray(message.content) &&
-                    message.content.length > 0 &&
-                    message.content[0].type === "image_url"
-                ) {
-                    // skip image urls
+
+        while (currentChunkTokens < maxTokens && messages.length > 0) {
+            const message = messages.pop();
+            if (
+                Array.isArray(message.content) &&
+                message.content.length > 0 &&
+                message.content[0].type === "image_url"
+            ) {
+                // skip image urls
+                continue;
+            } else {
+                if (!message.content) {
                     continue;
-                } else {
-                    if (!message.content) {
-                        continue;
-                    }
-                    let content =
-                        typeof message.content === "string"
-                            ? message.content
-                            : Array.isArray(message.content)
-                            ? message.content
-                                  .map((c) =>
-                                      typeof c === "string"
-                                          ? c
-                                          : c.text
-                                          ? c.text
-                                          : c.markdown
-                                          ? c.markdown
-                                          : ""
-                                  )
-                                  .join("")
-                            : typeof message.content === "object"
+                }
+                let content =
+                    typeof message.content === "string"
+                        ? message.content
+                        : Array.isArray(message.content)
+                        ? message.content
+                              .map((c) =>
+                                  typeof c === "string"
+                                      ? c
+                                      : c.text
+                                      ? c.text
+                                      : c.markdown
+                                      ? c.markdown
+                                      : ""
+                              )
+                              .join("")
+                        : typeof message.content === "object"
+                        ? message.content.text
                             ? message.content.text
-                                ? message.content.text
-                                : message.content.markdown
-                                ? message.content.markdown
-                                : ""
-                            : "";
-                    // trim content to max 3000 words
-                    content = content.split(" ").slice(0, 3000).join(" ");
-                    const tokens = encode(content).length;
-                    if (currentChunkTokens + tokens <= maxTokens) {
-                        currentChunks.push({
-                            role:
-                                message.role === "user" ||
-                                message.role === "assistant"
-                                    ? message.role
-                                    : "user",
-                            content: content,
-                        });
-                        currentChunkTokens += tokens;
-                    } else {
-                        break;
-                    }
+                            : message.content.markdown
+                            ? message.content.markdown
+                            : ""
+                        : "";
+                // trim content to max 3000 words
+                content = content.split(" ").slice(0, 3000).join(" ");
+                const tokens = encode(content).length;
+                if (currentChunkTokens + tokens <= maxTokens) {
+                    currentChunks.push({
+                        role:
+                            message.role === "user" ||
+                            message.role === "assistant"
+                                ? message.role
+                                : "user",
+                        content: content,
+                    });
+                    currentChunkTokens += tokens;
+                } else {
+                    // add the message back to the messages array so it can be picked up by the next iteration
+                    messages.push(message);
+                    // break out of the loop
+                    break;
                 }
             }
         }
@@ -1021,7 +1044,8 @@ async function detailedOutputHelper({
 
         const promptMessages = buildRichOutputPrompt({
             messagesExchanged: currentChunks,
-            outputGeneratedSoFar: outputGenerated,
+            outputGeneratedSoFar: outputGenerated || {},
+            outputData,
             input,
             output,
         });
@@ -1047,28 +1071,6 @@ async function detailedOutputHelper({
         });
 
         outputGenerated = response.outputGenerated;
-
-        if (
-            !outputGenerated ||
-            (outputGenerated.filter(
-                (x) => !(x.value === undefined) && !(x.value === "")
-            ).length === 0 &&
-                attempt < 2)
-        ) {
-            // give one more shot at this
-            return await detailedOutputHelper({
-                messages,
-                runId,
-                nodeId,
-                userId,
-                flowId,
-                input,
-                accountId,
-                attempt: attempt + 1,
-                outputData,
-                output,
-            });
-        }
 
         if (messages.length === 0) {
             completed = true;
@@ -1117,51 +1119,6 @@ async function createDetailedOutputWithMessages({
     return detailedOutput;
 }
 
-async function createDetailedOutputForRun({ runId, input }) {
-    const tasksDB = await db.getTasksDB();
-    const { rows: runs } = await tasksDB.query(
-        `SELECT flow_id, user_id, account_id FROM browserable.runs WHERE id = $1`,
-        [runId]
-    );
-    const flowId = runs[0].flow_id;
-    const userId = runs[0].user_id;
-    const accountId = runs[0].account_id;
-
-    let { rows: messageLogs } = await tasksDB.query(
-        `SELECT messages, created_at FROM browserable.message_logs WHERE run_id = $1 AND node_id IS NULL AND segment = 'agent' ORDER BY created_at DESC LIMIT 10`,
-        [runId]
-    );
-
-    messageLogs = messageLogs.sort(
-        (a, b) =>
-            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-    );
-
-    let messages = [];
-    for (const messageLog of messageLogs) {
-        messages.push(...messageLog.messages);
-    }
-
-    const detailedOutput = await detailedOutputHelper({
-        messages,
-        runId,
-        flowId,
-        accountId,
-        input,
-        userId,
-        outputData: [
-            {
-                key: "report",
-                name: "Report",
-                description: "Detailed report",
-                type: "markdown",
-            },
-        ],
-    });
-
-    return detailedOutput;
-}
-
 async function createUpdatesToDocuments({
     flowId,
     runId,
@@ -1171,7 +1128,7 @@ async function createUpdatesToDocuments({
     accountId,
     task,
     dtSchema,
-    structuredOutput,
+    learnedRows,
 }) {
     const tasksDB = await db.getTasksDB();
 
@@ -1187,7 +1144,7 @@ async function createUpdatesToDocuments({
         userName,
         timezoneOffsetInSeconds,
         shortlistedDocuments,
-        structuredOutput,
+        learnedRows,
         dtSchema,
     });
 
@@ -1211,6 +1168,8 @@ async function createUpdatesToDocuments({
     });
 
     const updates = response.updates;
+    const updateSummary = response.updateSummary;
+    let finalUpdates = [];
 
     if (updates && updates.length > 0) {
         for (const update of updates) {
@@ -1218,21 +1177,14 @@ async function createUpdatesToDocuments({
             if (!update.rowId) {
                 continue;
             }
-            // then fill flowId, accountId into it
-            update.flowId = flowId;
-            update.accountId = accountId;
-            // then update the document
-            await updateDocumentInDataTable({
-                flowId,
-                accountId,
-                rowId: update.rowId,
-                dtRow: update,
-            });
+            finalUpdates.push(update);
         }
     }
 
     return {
         success: true,
+        summaryOfUpdates: updateSummary,
+        updatedDocuments: finalUpdates,
     };
 }
 
@@ -1312,7 +1264,6 @@ module.exports = {
     getNodeAgentLog,
     createDetailedOutputForNode,
     createUpdatesToDocuments,
-    createDetailedOutputForRun,
     createDetailedOutputWithMessages,
     updateFlowCreatorStatus,
     turnOffFlowIfNoTriggers,

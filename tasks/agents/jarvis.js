@@ -11,7 +11,6 @@ const {
     updateNodeLiveStatus,
     createDetailedOutputForNode,
     createUpdatesToDocuments,
-    createDetailedOutputForRun,
     createDetailedOutputWithMessages,
     getNodeAgentLog,
     updateFlowCreatorStatus,
@@ -363,7 +362,7 @@ async function scheduleNodeLooper({
         const flowId = run.flow_id;
         const accountId = run.account_id;
 
-        // get the input of the node 
+        // get the input of the node
         const { rows: nodes } = await tasksDB.query(
             `SELECT input FROM browserable.nodes WHERE id = $1`,
             [nodeId]
@@ -1107,11 +1106,6 @@ async function endRun({ runId, userId, accountId, error, status }) {
         ],
     });
 
-    // const detailedOutput = await createDetailedOutputForRun({
-    //     runId,
-    //     input: runs[0].input,
-    // });
-
     await updateRunStatus({
         runId,
         userId,
@@ -1642,25 +1636,37 @@ async function endNode({
     output,
     threadId,
     reasoning,
-    report,
+    sync = false,
+    schemaStructuredOutput,
 }) {
-    await agentQueue.add(
-        `end-node`,
-        {
+    if (sync) {
+        await endNodeWorker({
             runId,
             nodeId,
             status,
-            threadId,
             output,
             reasoning,
-            report,
-        },
-        {
-            removeOnComplete: true,
-            jobId: `${runId}-end-node-${nodeId}`,
-            attempts: 2,
-        }
-    );
+            schemaStructuredOutput,
+        });
+    } else {
+        await agentQueue.add(
+            `end-node`,
+            {
+                runId,
+                nodeId,
+                status,
+                threadId,
+                output,
+                reasoning,
+                schemaStructuredOutput,
+            },
+            {
+                removeOnComplete: true,
+                jobId: `${runId}-end-node-${nodeId}`,
+                attempts: 2,
+            }
+        );
+    }
 }
 
 async function endNodeWorker({
@@ -1669,7 +1675,7 @@ async function endNodeWorker({
     status,
     output,
     reasoning,
-    report: reportFromCaller,
+    schemaStructuredOutput,
 }) {
     const tasksDB = await db.getTasksDB();
 
@@ -1701,19 +1707,21 @@ async function endNodeWorker({
     );
     const thread = threads[0] || {};
 
-    let { outputData } = nodeData.private_data || {};
+    const dtSchema = await getDataTableSchema({
+        flowId: run.flow_id,
+        accountId: run.account_id,
+    });
 
-    var report = "";
+    let learnedRows = [];
+    let summary = "";
+    let report = "";
 
-    if (reportFromCaller) {
-        report = reportFromCaller;
-    }
+    if (schemaStructuredOutput) {
+        learnedRows = schemaStructuredOutput;
+    } else {
+        let outputData = [];
 
-    if (!outputData) {
-        outputData = [];
-    }
-
-    if (!outputData.filter((x) => x.key === "report").length) {
+        // add a report key
         outputData.push({
             key: "report",
             type: "markdown",
@@ -1721,66 +1729,56 @@ async function endNodeWorker({
             description:
                 "Detailed findings of the agent in markdown format. Can be 1000+ words. Maintain a record of all the steps and decisions made by the agent related to the task. Make sure to include all the fields user mentioned in the task. There's no way report can be empty.",
         });
-    }
 
-    // add a summary key if it's not present
-    if (!outputData.filter((x) => x.key === "summary").length) {
+        // add a summary key
         outputData.push({
             key: "summary",
             type: "markdown",
             readableName: "Summary",
             description: "Short summary of the agent's work. 100 words max.",
         });
-    }
 
-    let shortlistedOutputData = outputData;
-
-    if (report) {
-        shortlistedOutputData = outputData.filter((x) => x.key !== "report");
-    }
-
-    let structuredOutput = await createDetailedOutputForNode({
-        runId,
-        nodeId,
-        input: nodeData.input,
-        outputData: shortlistedOutputData,
-        output,
-        userId: run.user_id,
-        useHistory: !report
-    });
-
-    if (!structuredOutput || !structuredOutput.length) {
-        structuredOutput = [];
-    }
-
-    if (report) {
-        // add report back to rest of structured output
-        structuredOutput.push({
-            key: "report",
-            type: "markdown",
-            readableName: "Report",
-            description:
-                "Detailed findings of the agent in markdown format. Can be 1000+ words. Maintain a record of all the steps and decisions made by the agent related to the task. Make sure to include all the fields user mentioned in the task. There's no way report can be empty.",
-            value: report,
+        outputData.push({
+            key: "rows",
+            type: `array of objects. Each object in the array should has following keys (and their values according to their description): 
+${JSON.stringify(dtSchema, null, 2)}`,
+            readableName: "Rows that user wants to see",
+            description: "Rows that user wants from this task.",
         });
-    }
 
-    let summary = "";
+        let structuredOutput = await createDetailedOutputForNode({
+            runId,
+            nodeId,
+            input: nodeData.input,
+            outputData,
+            output,
+            userId: run.user_id,
+            useHistory: true,
+        });
 
-    if (structuredOutput.filter((x) => x.key === "summary").length) {
-        summary = structuredOutput.find((x) => x.key === "summary").value;
-    } else {
-        summary = output;
+        if (structuredOutput && structuredOutput.summary) {
+            summary = structuredOutput.summary;
+        } else {
+            summary = output;
+        }
+
+        if (structuredOutput && structuredOutput.report) {
+            report = structuredOutput.report;
+        } else {
+            report = output;
+        }
+
+        learnedRows = structuredOutput.rows || [];
     }
 
     // save structured output in node's private_data
     let private_data = nodeData.private_data || {};
-    private_data.structuredOutput = structuredOutput;
-
-    await tasksDB.query(
-        `UPDATE browserable.nodes SET private_data = $1 WHERE id = $2`,
-        [JSON.stringify(private_data), nodeId]
-    );
+    private_data.structuredOutput = learnedRows;
+    saveNodePrivateData({
+        runId,
+        nodeId,
+        data: private_data,
+    });
 
     const { shortlistedDocumentIds } = thread.data || {};
 
@@ -1791,34 +1789,59 @@ async function endNodeWorker({
             ids: shortlistedDocumentIds,
         });
 
-        console.log("CHECK", shortlistedDocumentIds, shortlistedDocuments);
+        // SPECIAL CASE IF THE AGENT CODE IS DEEPRESEARCH_AGENT
+        // WHY THIS ISSUE?
+        // DR AGENT GENERATES ~6K tokens output.
+        // INCLUDING THAT + ORIGINAL DOCUMENT IN PROMPT IS EASY BUT GETTING THE UPDATES TO THE DOCUMENT IS A PAIN GIVEN THE 4K TOKEN LIMIT OF OPEN AI
+        // IF USER IS USING LARGE MODELS, THEN IT IS BETTER BUT WE WANT TO KEEP THIS SOLUTION SCALABLE ACROSS LLMs.
+        // FOR NOW, WE ASSUME DR, UPDATES THE WHOLE DOCUMENT. IN FUTURE, ONCE OPEN AI INCREASES THE RESPONSE LIMIT, WE CAN REMOVE THIS.
+        let summaryOfUpdates = "";
 
-        const dtSchema = await getDataTableSchema({
-            flowId: run.flow_id,
-            accountId: run.account_id,
-        });
+        if (nodeData.agent_code === "DEEPRESEARCH_AGENT") {
+            const parseLength = Math.min(
+                learnedRows.length,
+                shortlistedDocuments.length
+            );
 
-        let { updatedDocuments } = await createUpdatesToDocuments({
-            userId: run.user_id,
-            accountId: run.account_id,
-            runId,
-            nodeId,
-            shortlistedDocuments,
-            structuredOutput,
-            task: nodeData.input,
-            dtSchema,
-            flowId: run.flow_id,
-        });
-
-        if (updatedDocuments && updatedDocuments.length) {
-            for (const updatedDocument of updatedDocuments) {
+            for (let i = 0; i < parseLength; i++) {
+                const row = learnedRows[i];
+                const document = shortlistedDocuments[i];
                 await updateDocumentInDataTable({
                     flowId: run.flow_id,
                     accountId: run.account_id,
-                    rowId: updatedDocument.rowId,
-                    dtRow: updatedDocument,
+                    rowId: document.rowId,
+                    dtRow: Object.assign(document, row),
                 });
+                // We can improve this further by summarizing each value to 2-3 lines
+                summaryOfUpdates += `Updated document ${document.id}:
+Updated keys of the document: ${Object.keys(row).join(", ")}`;
             }
+        } else {
+            let { updatedDocuments, summaryOfUpdates: summaryOfUpdates2 } =
+                await createUpdatesToDocuments({
+                    userId: run.user_id,
+                    accountId: run.account_id,
+                    runId,
+                    nodeId,
+                    shortlistedDocuments,
+                    learnedRows,
+                    task: nodeData.input,
+                    dtSchema,
+                    flowId: run.flow_id,
+                });
+
+            if (updatedDocuments && updatedDocuments.length) {
+                for (const updatedDocument of updatedDocuments) {
+                    await updateDocumentInDataTable({
+                        flowId: run.flow_id,
+                        accountId: run.account_id,
+                        rowId: updatedDocument.rowId,
+                        dtRow: updatedDocument,
+                    });
+                }
+            }
+
+            summaryOfUpdates = summaryOfUpdates2;
         }
 
         await updateRunAgentLog({
@@ -1829,8 +1852,10 @@ async function endNodeWorker({
                     role: "jarvis",
                     content: `${nodeData.agent_code} ended.
     
-    ${nodeData.agent_code} summary:
-    ${summary}`,
+${nodeData.agent_code} summary:
+${summary}
+    
+${summaryOfUpdates}`,
                 },
             ],
         });
@@ -1843,8 +1868,8 @@ async function endNodeWorker({
                     role: "jarvis",
                     content: `${nodeData.agent_code} ended.
     
-    ${nodeData.agent_code} output:
-    ${JSON.stringify(structuredOutput, null, 2)}`,
+${nodeData.agent_code} output:
+${JSON.stringify(learnedRows, null, 2)}`,
                 },
             ],
         });
@@ -2083,8 +2108,34 @@ async function decideTaskDataTableOps({
     timezoneOffsetInSeconds,
     availableAgentsString,
     parentNodeStructuredOutput = null,
-    singleThreadMode = true,
+    singleThreadMode,
 }) {
+    if (singleThreadMode) {
+        // In single thread mode, each run adds one single new row to the results table.
+        return {
+            success: true,
+            actionCode: "decided_to_add_or_update_rows",
+            data: {
+                rows: [
+                    {
+                        ...(dtSchema.length > 0
+                            ? dtSchema
+                                  .map(({ key }) => ({
+                                      [key]: "",
+                                  }))
+                                  .reduce(
+                                      (acc, curr) => ({ ...acc, ...curr }),
+                                      {}
+                                  )
+                            : {}),
+                        subTask: `${task}
+    ${triggerInput ? `Trigger input: ${triggerInput}` : ""}`,
+                    },
+                ],
+            },
+        };
+    }
+
     if (attempt > 5) {
         await updateNodeUserLog({
             runId,
@@ -2293,7 +2344,7 @@ async function decideTaskDataTableOps({
                                     data,
                                     thinking,
                                 },
-                                name: "results table analysis",
+                                name: "Results table analysis",
                             },
                         ],
                     },
@@ -2330,6 +2381,7 @@ async function decideTaskDataTableOps({
             availableAgentsString,
             parentNodeStructuredOutput,
             singleThreadMode,
+            dtSchema,
         });
     } else if (actionCode === "work_on_subtask_before_deciding") {
         return {
@@ -2467,7 +2519,8 @@ async function decideAgent({ runId, preferredNodeId }) {
             flowMetadata = flowMetadataRows[0].metadata;
         }
 
-        const singleThreadMode = !flowMetadata.allowMultipleThreads;
+        const singleThreadMode =
+            !!flowMetadata.agent_codes.includes("DEEPRESEARCH_AGENT");
 
         // in users table there will be a settings column. settings.timezoneOffsetInSeconds is what we need
         const { rows: users } = await tasksDB.query(
@@ -2824,7 +2877,6 @@ async function decideAgent({ runId, preferredNodeId }) {
                 const {
                     agentCode,
                     aiData,
-                    outputData,
                     reasoningForPickingAgent,
                     summaryOfEverythingHappenedSoFar,
                 } = response;
@@ -2966,7 +3018,6 @@ ${JSON.stringify(aiData, null, 2)}
                                 threadLevel: parentThreadLevel,
                                 shortlistedDocumentIds,
                                 shortlistedDocuments,
-                                outputData,
                             }),
                             threadId,
                         ]
@@ -3035,6 +3086,11 @@ ${JSON.stringify(aiData, null, 2)}
                 });
                 return;
             } else {
+                const dtSchema = await getDataTableSchema({
+                    flowId: run.flow_id,
+                    accountId: run.account_id,
+                });
+
                 const { success, actionCode, data, error } =
                     await decideTaskDataTableOps({
                         flowId: run.flow_id,
@@ -3048,6 +3104,7 @@ ${JSON.stringify(aiData, null, 2)}
                         availableAgentsString,
                         parentNodeStructuredOutput,
                         singleThreadMode,
+                        dtSchema,
                     });
 
                 if (!success) {
@@ -3579,8 +3636,16 @@ agentQueue.process("jarvis-queue-job", 4, async (job, done) => {
 
 agentQueue.process("end-node", async (job, done) => {
     try {
-        const { runId, nodeId, status, threadId, output, reasoning, report } =
-            job.data;
+        const {
+            runId,
+            nodeId,
+            status,
+            threadId,
+            output,
+            reasoning,
+            report,
+            schemaStructuredOutput,
+        } = job.data;
 
         await endNodeWorker({
             runId,
@@ -3589,6 +3654,7 @@ agentQueue.process("end-node", async (job, done) => {
             output,
             reasoning,
             report,
+            schemaStructuredOutput,
         });
     } catch (error) {
         console.error("Error in end-node", error);
@@ -4227,6 +4293,7 @@ const jarvis = {
     updateThreadData,
     updateFlowCreatorStatus,
     getThreadData,
+    getDataTableSchema,
 };
 
 module.exports = jarvis;
