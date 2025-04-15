@@ -2,6 +2,7 @@ const { callOpenAICompatibleLLMWithRetry } = require("../services/llm");
 const { agent: GenerativeAgent } = require("./generative");
 const { agent: BrowserableAgent } = require("./browserable");
 const { agent: DeepResearchAgent } = require("./deepresearch");
+const { createGifFromMessageLogs } = require("../logic/logs");
 const { sendEmail } = require("../services/email");
 const { z } = require("zod");
 const { zodResponseFormat } = require("openai/helpers/zod");
@@ -1138,6 +1139,19 @@ async function endRun({ runId, userId, accountId, error, status }) {
             [runId, accountId]
         );
         const flowId = runs[0].flow_id;
+
+        if (status === "completed") {
+            // lets start a task job that creates a gif for this run
+            await agentQueue.add(
+                `create-gif`,
+                {
+                    runId,
+                    flowId,
+                    accountId,
+                },
+                { removeOnComplete: true }
+            );
+        }
 
         await turnOffFlowIfNoTriggers({ flowId, accountId, userId });
     }
@@ -3613,6 +3627,26 @@ ${JSON.stringify(aiData, null, 2)}
         });
     }
 }
+
+agentQueue.process("create-gif", async (job, done) => {
+    const { runId, flowId, accountId } = job.data;
+    const { succes, error, gifUrl } = await createGifFromMessageLogs({
+        runId,
+        flowId,
+        accountId,
+    });
+
+    if (success && gifUrl) {
+        // update the gifUrl in the private data of this run
+        await updateRunKeyVal({
+            runId,
+            data: {
+                gifUrl,
+            },
+        });
+    }
+    done();
+});
 
 agentQueue.process("jarvis-queue-job", 4, async (job, done) => {
     const { code, functionToCall, functionArgs } = job.data;

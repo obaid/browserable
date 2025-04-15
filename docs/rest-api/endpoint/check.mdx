@@ -6,28 +6,6 @@ description: "Verify if your API key is valid"
 
 Use this endpoint to verify if your API key is valid and working correctly.
 
-### Headers
-
-<ParamField header="x-api-key" type="string" required>
-  Your API key for authentication
-</ParamField>
-
-### Response
-
-<ResponseField name="success" type="boolean">
-  Indicates if the API key is valid
-</ResponseField>
-
-<ResponseField name="data" type="object">
-  <Expandable title="Properties">
-    <ResponseField name="account_id" type="string">
-      The account ID associated with the API key
-    </ResponseField>
-    <ResponseField name="user_id" type="string">
-      The user ID associated with the API key
-    </ResponseField>
-  </Expandable>
-</ResponseField>
 
 <RequestExample>
 ```bash

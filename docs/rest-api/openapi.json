@@ -58,17 +58,8 @@
                       "type": "boolean"
                     },
                     "data": {
-                      "type": "object",
-                      "properties": {
-                        "account_id": {
-                          "type": "string",
-                          "description": "The account ID associated with the API key"
-                        },
-                        "user_id": {
-                          "type": "string",
-                          "description": "The user ID associated with the API key"
-                        }
-                      }
+                      "type": "string",
+                      "example": "ok"
                     }
                   }
                 }
@@ -92,19 +83,13 @@
                 "properties": {
                   "task": {
                     "type": "string",
-                    "description": "Natural language description of the task to be automated"
+                    "description": "Natural language description of the task to be automated",
+                    "example": "Monitor a website for price changes"
                   },
                   "agent": {
                     "type": "string",
                     "default": "BROWSER_AGENT",
                     "description": "Agent to use for the task"
-                  },
-                  "triggers": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "description": "List of triggers that determine when the task should run. If null, triggers will be auto-generated. If undefined, defaults to running once immediately."
                   }
                 }
               }
@@ -120,14 +105,17 @@
                   "type": "object",
                   "properties": {
                     "success": {
-                      "type": "boolean"
+                      "type": "boolean",
+                      "description": "Indicates if the request was successful",
+                      "example": true
                     },
                     "data": {
                       "type": "object",
                       "properties": {
                         "taskId": {
                           "type": "string",
-                          "description": "The ID of the created task"
+                          "description": "The ID of the created task",
+                          "example": "task_123"
                         }
                       }
                     },
@@ -154,7 +142,8 @@
             "description": "Page number for pagination",
             "schema": {
               "type": "integer",
-              "default": 1
+              "default": 1,
+              "example": 1
             }
           },
           {
@@ -164,7 +153,8 @@
             "schema": {
               "type": "integer",
               "default": 30,
-              "maximum": 30
+              "maximum": 30,
+              "example": 30
             }
           }
         ],
@@ -177,34 +167,53 @@
                   "type": "object",
                   "properties": {
                     "success": {
-                      "type": "boolean"
+                      "type": "boolean",
+                      "description": "Indicates if the request was successful",
+                      "example": true
                     },
                     "data": {
                       "type": "array",
+                      "description": "Array of task objects",
                       "items": {
                         "type": "object",
                         "properties": {
                           "id": {
-                            "type": "string"
+                            "type": "string",
+                            "description": "Unique identifier for the task",
+                            "example": "task_123"
                           },
                           "status": {
                             "type": "string",
-                            "enum": ["active", "inactive"]
+                            "enum": ["active", "inactive"],
+                            "description": "Current status of the task",
+                            "example": "active"
                           },
                           "readable_name": {
-                            "type": "string"
+                            "type": "string",
+                            "description": "Human-readable name of the task",
+                            "example": "My Task"
                           }
                         }
                       }
                     },
                     "total": {
-                      "type": "integer"
+                      "type": "integer",
+                      "description": "Total number of tasks",
+                      "example": 1
                     },
                     "page": {
-                      "type": "integer"
+                      "type": "integer",
+                      "description": "Current page number",
+                      "example": 1
                     },
                     "limit": {
-                      "type": "integer"
+                      "type": "integer",
+                      "description": "Number of tasks per page",
+                      "example": 30
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Error message if the request failed"
                     }
                   }
                 }
@@ -282,6 +291,10 @@
                     },
                     "limit": {
                       "type": "integer"
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Error message if the request failed"
                     }
                   }
                 }
@@ -302,7 +315,8 @@
             "required": true,
             "description": "The ID of the task",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "task_123"
             }
           },
           {
@@ -311,7 +325,8 @@
             "required": false,
             "description": "The ID of the run. If not provided, returns status of the most recent run.",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "run_456"
             }
           }
         ],
@@ -324,23 +339,34 @@
                   "type": "object",
                   "properties": {
                     "success": {
-                      "type": "boolean"
+                      "type": "boolean",
+                      "description": "Indicates if the request was successful",
+                      "example": true
                     },
                     "data": {
                       "type": "object",
                       "properties": {
                         "status": {
                           "type": "string",
-                          "enum": ["scheduled", "running", "completed", "error"]
+                          "enum": ["scheduled", "running", "completed", "error"],
+                          "description": "High-level status of the task run",
+                          "example": "running"
                         },
                         "detailedStatus": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "Detailed status information about the current state",
+                          "example": "processing_page"
                         },
                         "inputWait": {
-                          "type": "object"
+                          "type": "object",
+                          "description": "Information about any user input being waited on",
+                          "nullable": true,
+                          "example": null
                         },
                         "liveStatus": {
-                          "type": "object"
+                          "type": "object",
+                          "description": "Real-time status information about the current operation",
+                          "example": "<live url>"
                         }
                       }
                     }
@@ -363,7 +389,8 @@
             "required": true,
             "description": "The ID of the task",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "task_123"
             }
           },
           {
@@ -372,7 +399,8 @@
             "required": false,
             "description": "The ID of the run. If not provided, returns results of the most recent run.",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "example": "run_456"
             }
           }
         ],
@@ -385,28 +413,49 @@
                   "type": "object",
                   "properties": {
                     "success": {
-                      "type": "boolean"
+                      "type": "boolean",
+                      "description": "Indicates if the request was successful",
+                      "example": true
                     },
                     "data": {
                       "type": "object",
                       "properties": {
                         "status": {
                           "type": "string",
-                          "enum": ["scheduled", "running", "completed", "error"]
+                          "enum": ["scheduled", "running", "completed", "error"],
+                          "description": "Status of the run",
+                          "example": "completed"
                         },
                         "error": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "Error message if the run failed",
+                          "example": null
                         },
                         "output": {
-                          "type": "object"
+                          "type": "object",
+                          "description": "Output data from the completed run",
+                          "example": {
+                            "summary": "Task completed successfully"
+                          }
                         },
                         "dataTable": {
                           "type": "array",
+                          "description": "Array of documents collected during the run",
                           "items": {
                             "type": "object"
-                          }
+                          },
+                          "example": [
+                            {
+                              "title": "Sample Data",
+                              "value": 123
+                            }
+                          ]
                         }
                       }
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Error message if the request failed"
                     }
                   }
                 }
@@ -450,6 +499,10 @@
                   "properties": {
                     "success": {
                       "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Error message if the request failed"
                     }
                   }
                 }
@@ -484,6 +537,73 @@
                   "properties": {
                     "success": {
                       "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task/{taskId}/run/gif": {
+      "get": {
+        "summary": "Get Task Run GIF",
+        "description": "Get the GIF for a specific task run",
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "description": "The ID of the task",
+            "schema": {
+              "type": "string",
+              "example": "task_123"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "query",
+            "required": false,
+            "description": "The ID of the run. If not provided, returns GIF status of the most recent run.",
+            "schema": {
+              "type": "string",
+              "example": "run_456"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "Indicates if the request was successful",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "description": "Status of the GIF generation",
+                          "example": "completed"
+                        },
+                        "url": {
+                          "type": "string",
+                          "description": "URL of the generated GIF",
+                          "example": "https://example.com/gif.gif"
+                        },
+                        "error": {
+                          "type": "string",
+                          "description": "Error message if the GIF generation failed",
+                          "nullable": true
+                        }
+                      }
                     }
                   }
                 }

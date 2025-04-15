@@ -18,6 +18,7 @@ const {
     getDocumentsFromDataTable,
     getDataTableSchema,
 } = require("../logic/datatable");
+const { getGifStatus } = require("../logic/logs");
 
 // Middleware to validate API key and get account/user info
 const validateApiKey = async (req, res, next) => {
@@ -49,7 +50,7 @@ const validateApiKey = async (req, res, next) => {
 
 // Create task
 router.post("/task/create", cors(), validateApiKey, async (req, res) => {
-    const { task, agent = "BROWSER_AGENT", triggers } = req.body;
+    const { task, agent = "BROWSER_AGENT" } = req.body;
 
     if (!task) {
         return res.json({ success: false, error: "Task is required" });
@@ -93,71 +94,72 @@ ONLY output the JSON, nothing else.`,
             max_attempts: 4,
         });
 
-        let finalTriggers = triggers;
-        let readableDescriptionOfTriggers = "";
+        // let finalTriggers = triggers;
+        let finalTriggers = ["once|0|"];
+        let readableDescriptionOfTriggers = "Runs once immediately.";
 
-        if (triggers === null) {
-            // Generate triggers if explicitly set to null
-            const triggersResponse = await callOpenAICompatibleLLMWithRetry({
-                messages: [
-                    {
-                        role: "system",
-                        content: `You are a helpful assistant to figure out the when to run a task.`,
-                    },
-                    {
-                        role: "user",
-                        content: `Given the following task that user wants to run (user entered in natural language):
-------------
-${task}
-------------
+//         if (triggers === null) {
+//             // Generate triggers if explicitly set to null
+//             const triggersResponse = await callOpenAICompatibleLLMWithRetry({
+//                 messages: [
+//                     {
+//                         role: "system",
+//                         content: `You are a helpful assistant to figure out the when to run a task.`,
+//                     },
+//                     {
+//                         role: "user",
+//                         content: `Given the following task that user wants to run (user entered in natural language):
+// ------------
+// ${task}
+// ------------
 
-Figure out the when to run the task. (i.e, what all triggers are possible for the task)
+// Figure out the when to run the task. (i.e, what all triggers are possible for the task)
 
-Available triggers are:
-1. "once|<delay>|" ---> instantly creates a run with the provided delay. delay is in milliseconds.
-2. "crontab|<crontab_string>|" ---> creates a task with the crontab string to run as long as it is active
-3. event.once|<event_id>|" ---> integrations can parse this event id to create a run
-4. event.every|<event_id>|" ---> integrations can parse this event id to create a run
+// Available triggers are:
+// 1. "once|<delay>|" ---> instantly creates a run with the provided delay. delay is in milliseconds.
+// 2. "crontab|<crontab_string>|" ---> creates a task with the crontab string to run as long as it is active
+// 3. event.once|<event_id>|" ---> integrations can parse this event id to create a run
+// 4. event.every|<event_id>|" ---> integrations can parse this event id to create a run
 
-It's mandatory to have at least one trigger. Worst case, you can use "once|0|" as a trigger.
+// It's mandatory to have at least one trigger. Worst case, you can use "once|0|" as a trigger.
 
-Available triggers for the task:
-${getAvailableTriggers({
-    agent_codes: [agent],
-})}
+// Available triggers for the task:
+// ${getAvailableTriggers({
+//     agent_codes: [agent],
+// })}
 
-Output format: (JSON)
-{
-    "readableDescriptionOfTriggers": "<readableDescriptionOfTriggers>",
-    "triggers": ["trigger1", "trigger2", "trigger3"]
-}
+// Output format: (JSON)
+// {
+//     "readableDescriptionOfTriggers": "<readableDescriptionOfTriggers>",
+//     "triggers": ["trigger1", "trigger2", "trigger3"]
+// }
 
-ONLY output the JSON, nothing else.`,
-                    },
-                ],
-                models: [
-                    "gemini-2.0-flash",
-                    "deepseek-chat",
-                    "deepseek-reasoner",
-                    "claude-3-5-sonnet",
-                    "gpt-4o",
-                ],
-                metadata: {
-                    [uniqueKeyInMetadata]: uniqueValInMetadata,
-                    accountId: req.account_id,
-                    usecase: "generator",
-                },
-                max_attempts: 5,
-            });
+// ONLY output the JSON, nothing else.`,
+//                     },
+//                 ],
+//                 models: [
+//                     "gemini-2.0-flash",
+//                     "deepseek-chat",
+//                     "deepseek-reasoner",
+//                     "claude-3-5-sonnet",
+//                     "gpt-4o",
+//                 ],
+//                 metadata: {
+//                     [uniqueKeyInMetadata]: uniqueValInMetadata,
+//                     accountId: req.account_id,
+//                     usecase: "generator",
+//                 },
+//                 max_attempts: 5,
+//             });
 
-            finalTriggers = triggersResponse.triggers;
-            readableDescriptionOfTriggers =
-                triggersResponse.readableDescriptionOfTriggers;
-        } else if (!triggers) {
-            // Default to once|0| if undefined
-            finalTriggers = ["once|0|"];
-            readableDescriptionOfTriggers = "Run once immediately.";
-        }
+//             finalTriggers = triggersResponse.triggers;
+//             readableDescriptionOfTriggers =
+//                 triggersResponse.readableDescriptionOfTriggers;
+//         } else if (!triggers) {
+//             // Default to once|0| if undefined
+//             finalTriggers = ["once|0|"];
+//             readableDescriptionOfTriggers = "Run once immediately.";
+//         }
 
         const { flowId } = await createFlow({
             flow: {
@@ -590,6 +592,29 @@ router.put("/task/:taskId/stop", cors(), validateApiKey, async (req, res) => {
         res.json({
             success: true,
         });
+    } catch (e) {
+        console.log(e);
+        res.json({ success: false, error: e.message });
+    }
+});
+
+// Get GIF status for a run
+router.get("/task/:taskId/run/:runId?/gif", cors(), validateApiKey, async (req, res) => {
+    const { taskId } = req.params;
+    const runId = req.params.runId;
+
+    if (!taskId) {
+        return res.json({ success: false, error: "Task ID is required" });
+    }
+
+    try {
+        const result = await getGifStatus({
+            flowId: taskId,
+            runId,
+            accountId: req.account_id
+        });
+
+        res.json(result);
     } catch (e) {
         console.log(e);
         res.json({ success: false, error: e.message });

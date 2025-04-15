@@ -1,6 +1,16 @@
 FROM --platform=linux/amd64 node:18
 # FROM node:11.12.0-alpine
 
+# Install system dependencies required for canvas
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libjpeg-dev \
+    libgif-dev \
+    librsvg2-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # create an app directory and use it as working directory
 RUN mkdir -p /tasks
 WORKDIR /tasks

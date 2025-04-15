@@ -160,9 +160,9 @@ app.use(
     companionApp
 );
 
-// Add test upload route
-const testUploadRouter = require("./routes/test-upload");
-app.use("/test-upload", testUploadRouter);
+// Add test utils route
+const testUtilsRouter = require("./routes/test-utils");
+app.use("/test-utils", testUtilsRouter);
 
 // Health check endpoint
 app.get("/health", (req, res) => {
