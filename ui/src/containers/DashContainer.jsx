@@ -56,6 +56,21 @@ function Dash(props) {
     fn();
   }, []);
 
+  const [sampleTasks] = useState([
+    {
+      id: 1,
+      task: "Find the top trending GitHub repos of the day"
+    },
+    {
+      id: 2,
+      task: "Find a Coursera course that teaches Python to beginners"
+    },
+    {
+      id: 3,
+      task: "Tell me the names of Trump's kids"
+    }
+  ]);
+
   useEffect(() => {
     setAgents(
       (integrations.data || []).map((integration) => ({
@@ -291,6 +306,23 @@ function Dash(props) {
                         </>
                       )}
                     </motion.div>
+                  </div>
+                </div>
+                <div className="w-full max-w-xl mt-8">
+                  <p className="text-sm text-gray-600 mb-2 font-bold">Or try one of these sample tasks:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {sampleTasks.map((sample) => (
+                      <motion.button
+                        key={sample.id}
+                        onClick={() => setStory(sample.task)}
+                        style={{ border: '1px solid #D1D5DB' }}
+                        className="px-3 py-1 bg-white hover:bg-gray-50 text-gray-700 text-sm rounded-lg transition-colors duration-150 text-left"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        {sample.task}
+                      </motion.button>
+                    ))}
                   </div>
                 </div>
               </div>
