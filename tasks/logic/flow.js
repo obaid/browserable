@@ -966,7 +966,9 @@ async function detailedOutputHelper({
     outputGenerated,
     userId,
     attempt = 0,
+    jsonSchema,
 }) {
+
     // Iteratively go through the messages (with chunking at 10000 tokens) and iteratively call the LLM to get the detailed output and reasoning
     let completed = false;
     let maxTokens = 10000;
@@ -977,6 +979,7 @@ async function detailedOutputHelper({
 
         while (currentChunkTokens < maxTokens && messages.length > 0) {
             const message = messages.pop();
+
             if (
                 Array.isArray(message.content) &&
                 message.content.length > 0 &&
@@ -1013,22 +1016,15 @@ async function detailedOutputHelper({
                 // trim content to max 3000 words
                 content = content.split(" ").slice(0, 3000).join(" ");
                 const tokens = encode(content).length;
-                if (currentChunkTokens + tokens <= maxTokens) {
-                    currentChunks.push({
-                        role:
-                            message.role === "user" ||
-                            message.role === "assistant"
-                                ? message.role
-                                : "user",
-                        content: content,
-                    });
-                    currentChunkTokens += tokens;
-                } else {
-                    // add the message back to the messages array so it can be picked up by the next iteration
-                    messages.push(message);
-                    // break out of the loop
-                    break;
-                }
+                currentChunks.push({
+                    role:
+                        message.role === "user" ||
+                        message.role === "assistant"
+                            ? message.role
+                            : "user",
+                    content: content,
+                });
+                currentChunkTokens += tokens;
             }
         }
 
@@ -1049,7 +1045,7 @@ async function detailedOutputHelper({
             input,
             output,
         });
-
+        
         const response = await callOpenAICompatibleLLMWithRetry({
             messages: promptMessages,
             models: [
@@ -1068,6 +1064,7 @@ async function detailedOutputHelper({
                 usecase: "detailed_output",
             },
             max_attempts: 4,
+            jsonSchema,
         });
 
         outputGenerated = response.outputGenerated;
@@ -1089,6 +1086,7 @@ async function detailedOutputHelper({
 
     return outputGenerated;
 }
+
 
 async function createDetailedOutputWithMessages({
     messages,
@@ -1196,6 +1194,7 @@ async function createDetailedOutputForNode({
     output,
     outputData,
     useHistory,
+    jsonSchema,
 }) {
     const tasksDB = await db.getTasksDB();
 
@@ -1228,6 +1227,7 @@ async function createDetailedOutputForNode({
         outputData,
         output,
         userId,
+        jsonSchema,
     });
 
     return detailedOutput;

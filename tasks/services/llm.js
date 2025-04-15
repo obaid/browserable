@@ -44,6 +44,7 @@ async function callOpenAICompatibleLLMWithRetry({
     dontTryParser = false,
     metadata = {},
     max_attempts = 3,
+    jsonSchema,
 }) {
     if (!models && model) {
         models = [model];
@@ -73,21 +74,26 @@ async function callOpenAICompatibleLLMWithRetry({
             if (llmKeys["openai"]) {
                 accountSpecificModelKeys["gpt-4o"] = llmKeys["openai"];
                 accountSpecificModelKeys["gpt-4o-mini"] = llmKeys["openai"];
-            } 
+            }
 
             if (llmKeys["deepseek"]) {
                 accountSpecificModelKeys["deepseek-chat"] = llmKeys["deepseek"];
-                accountSpecificModelKeys["deepseek-reasoner"] = llmKeys["deepseek"];
+                accountSpecificModelKeys["deepseek-reasoner"] =
+                    llmKeys["deepseek"];
             }
 
             if (llmKeys["claude"]) {
-                accountSpecificModelKeys["claude-3-5-sonnet"] = llmKeys["claude"];
-                accountSpecificModelKeys["claude-3-5-haiku"] = llmKeys["claude"];
+                accountSpecificModelKeys["claude-3-5-sonnet"] =
+                    llmKeys["claude"];
+                accountSpecificModelKeys["claude-3-5-haiku"] =
+                    llmKeys["claude"];
             }
 
             if (llmKeys["gemini"]) {
-                accountSpecificModelKeys["gemini-2.0-flash"] = llmKeys["gemini"];
-                accountSpecificModelKeys["gemini-2.0-flash-lite"] = llmKeys["gemini"];
+                accountSpecificModelKeys["gemini-2.0-flash"] =
+                    llmKeys["gemini"];
+                accountSpecificModelKeys["gemini-2.0-flash-lite"] =
+                    llmKeys["gemini"];
             }
 
             if (llmKeys["qwen"]) {
@@ -96,31 +102,40 @@ async function callOpenAICompatibleLLMWithRetry({
         }
     }
 
-    if (!!process.env.OPENAI_API_KEY) { 
+    if (!!process.env.OPENAI_API_KEY) {
         serverSpecificModelKeys["gpt-4o"] = process.env.OPENAI_API_KEY;
         serverSpecificModelKeys["gpt-4o-mini"] = process.env.OPENAI_API_KEY;
     }
 
     if (!!process.env.DEEPSEEK_API_KEY) {
         serverSpecificModelKeys["deepseek-chat"] = process.env.DEEPSEEK_API_KEY;
-        serverSpecificModelKeys["deepseek-reasoner"] = process.env.DEEPSEEK_API_KEY;
+        serverSpecificModelKeys["deepseek-reasoner"] =
+            process.env.DEEPSEEK_API_KEY;
     }
 
     if (!!process.env.CLAUDE_API_KEY) {
-        serverSpecificModelKeys["claude-3-5-sonnet"] = process.env.CLAUDE_API_KEY;
-        serverSpecificModelKeys["claude-3-5-haiku"] = process.env.CLAUDE_API_KEY;
+        serverSpecificModelKeys["claude-3-5-sonnet"] =
+            process.env.CLAUDE_API_KEY;
+        serverSpecificModelKeys["claude-3-5-haiku"] =
+            process.env.CLAUDE_API_KEY;
     }
 
     if (!!process.env.GEMINI_API_KEY) {
-        serverSpecificModelKeys["gemini-2.0-flash"] = process.env.GEMINI_API_KEY;
-        serverSpecificModelKeys["gemini-2.0-flash-lite"] = process.env.GEMINI_API_KEY;
+        serverSpecificModelKeys["gemini-2.0-flash"] =
+            process.env.GEMINI_API_KEY;
+        serverSpecificModelKeys["gemini-2.0-flash-lite"] =
+            process.env.GEMINI_API_KEY;
     }
 
     if (!!process.env.QWEN_API_KEY) {
         serverSpecificModelKeys["qwen-plus"] = process.env.QWEN_API_KEY;
     }
 
-    const modelKeys = Object.assign({}, accountSpecificModelKeys, serverSpecificModelKeys);
+    const modelKeys = Object.assign(
+        {},
+        accountSpecificModelKeys,
+        serverSpecificModelKeys
+    );
 
     models = models.filter((model) => modelKeys[model]);
 
@@ -143,6 +158,7 @@ async function callOpenAICompatibleLLMWithRetry({
                 metadata,
                 attempt,
                 modelKeys,
+                jsonSchema,
             });
         } catch (e) {
             if (attempt === max_attempts - 1) {
@@ -158,7 +174,8 @@ async function callOpenAICompatibleLLM({
     max_tokens,
     dontTryParser = false,
     metadata = {},
-    modelKeys = {}
+    modelKeys = {},
+    jsonSchema,
 }) {
     const tasksDB = await db.getTasksDB();
     const createdAt = new Date();
@@ -171,6 +188,8 @@ async function callOpenAICompatibleLLM({
             apiKey: modelKeys["qwen-plus"],
             actualModel: "qwen-plus",
             supportedImageAs: "base64",
+            supportedJsonSchema: true, // yet to test this.
+            supportedJsonOutput: true, // yet to test this.
         },
         "gpt-4o": {
             endpoint: "https://api.openai.com/v1/chat/completions",
@@ -179,6 +198,8 @@ async function callOpenAICompatibleLLM({
             supportedImageAs: !!Number(process.env.SINGLE_USER_MODE)
                 ? "base64"
                 : "url",
+            supportedJsonSchema: true,
+            supportedJsonOutput: true,
         },
         "gpt-4o-mini": {
             endpoint: "https://api.openai.com/v1/chat/completions",
@@ -187,6 +208,8 @@ async function callOpenAICompatibleLLM({
             supportedImageAs: !!Number(process.env.SINGLE_USER_MODE)
                 ? "base64"
                 : "url",
+            supportedJsonSchema: true,
+            supportedJsonOutput: true,
         },
         "gemini-2.0-flash": {
             endpoint:
@@ -194,6 +217,7 @@ async function callOpenAICompatibleLLM({
             apiKey: modelKeys["gemini-2.0-flash"],
             actualModel: "gemini-2.0-flash",
             supportedImageAs: "base64",
+            supportedJsonSchema: true,
         },
         "gemini-2.0-flash-lite": {
             endpoint:
@@ -201,33 +225,42 @@ async function callOpenAICompatibleLLM({
             apiKey: modelKeys["gemini-2.0-flash-lite"],
             actualModel: "gemini-2.0-flash-lite",
             supportedImageAs: "base64",
+            supportedJsonSchema: true,
+            supportedJsonOutput: true,
         },
         "deepseek-chat": {
             endpoint: "https://api.deepseek.com/chat/completions",
             apiKey: modelKeys["deepseek-chat"],
             actualModel: "deepseek-chat",
             supportedImageAs: "",
+            supportedJsonSchema: true,
+            supportedJsonOutput: true,
         },
         "deepseek-reasoner": {
             endpoint: "https://api.deepseek.com/chat/completions",
             apiKey: modelKeys["deepseek-reasoner"],
             actualModel: "deepseek-reasoner",
             supportedImageAs: "",
+            supportedJsonSchema: false,
+            supportedJsonOutput: true,
         },
         "claude-3-5-sonnet": {
             endpoint: "https://api.anthropic.com/v1/chat/completions",
             apiKey: modelKeys["claude-3-5-sonnet"],
             actualModel: "claude-3-5-sonnet-latest",
             supportedImageAs: "base64",
+            supportedJsonSchema: false,
+            supportedJsonOutput: false,
         },
         "claude-3-5-haiku": {
             endpoint: "https://api.anthropic.com/v1/chat/completions",
             apiKey: modelKeys["claude-3-5-haiku"],
             actualModel: "claude-3-5-haiku-latest",
             supportedImageAs: "base64",
+            supportedJsonSchema: false,
+            supportedJsonOutput: false,
         },
     };
-
 
     // Insert initial record without response
     const initialInsertResult = await tasksDB.query(
@@ -293,6 +326,13 @@ async function callOpenAICompatibleLLM({
                 // frequency_penalty: 0,
                 // presence_penalty: 0,
                 messages: copyOfMessages,
+                ...(models[model].supportedJsonSchema && jsonSchema
+                    ? {
+                          response_format: jsonSchema
+                      }
+                    : models[model].supportedJsonOutput
+                    ? { response_format: { type: "json_object" } }
+                    : {}),
             },
             {
                 headers: {
@@ -349,7 +389,11 @@ async function callOpenAICompatibleLLM({
                 await tasksDB.query(
                     `UPDATE browserable.llm_calls SET response = $1::json, completed_at = $2 WHERE id = $3`,
                     [
-                        JSON.stringify({ error: fixError.message, originalResponse: res.data.choices[0].message.content }),
+                        JSON.stringify({
+                            error: fixError.message,
+                            originalResponse:
+                                res.data.choices[0].message.content,
+                        }),
                         new Date(),
                         callId,
                     ]

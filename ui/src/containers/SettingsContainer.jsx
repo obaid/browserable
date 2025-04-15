@@ -284,7 +284,7 @@ function SettingsContainer(props) {
                     <tbody>
                       {Object.entries({
                         OpenAI: "openai",
-                        Anthropic: "anthropic",
+                        Anthropic: "claude",
                         Gemini: "gemini",
                       }).map(([displayName, provider]) => (
                         <tr

@@ -61,15 +61,22 @@ ${messagesExchanged
         : ""
 }
 
-****************OUTPUT START****************
-FORMAT: JSON OBJECT WITH ONLY ONE KEY "outputGenerated"
+****************OUTPUT SCHEMA START****************
+FORMAT: JSON OBJECT WITH ONLY ONE KEY "outputGenerated".
 {
     "outputGenerated": {
-${outputData.map((x) => `     "${x.key}": <${x.type}>. ${x.description}.`).join("\n")}
+        ${outputData.map((x) => `     "${x.key}": <${x.type}>. ${x.description}.`).join("\n")}
     }
 }
 IMPORTANT: If the description specifies a word limit (e.g., '100 words max'), count your words and ensure you stay under that limit.
 IMPORTANT: The overall output must not exceed 4000 words. Make sure to stay under that limit so that the final output is a properly structured JSON object.
+
+1. IF OUTPUT GENERATED SO FAR IS EMPTY, YOU MUST START YOUR PROCESS FROM THE OUTPUT SCHEMA.
+2. IF OUTPUT GENERATED SO FAR IS NOT EMPTY, YOU MUST START YOUR PROCESS FROM OUTPUT GENERATED SO FAR AND BUILD ON TOP OF THAT WITH NEW LEARNINGS.
+
+MAIN RULE:
+1. DO NOT RETURN THE OUTPUT SCHEMA START AS IT IS. 
+
 ONLY PRINT THE JSON OBJECT AND NOTHING ELSE.
 ****************OUTPUT END****************
 `,

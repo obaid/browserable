@@ -13,7 +13,7 @@ browserQueue.process("turn-off-session", async (job, done) => {
     done();
 });
 
-// add a job to browserqueue that checks every 15 mins, all the running requests
+// add a job to browserqueue that checks every 30 seconds, all the running requests
 browserQueue.add(
     "check-running-sessions-and-close",
     {},

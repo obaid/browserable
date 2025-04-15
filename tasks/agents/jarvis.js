@@ -3,6 +3,8 @@ const { agent: GenerativeAgent } = require("./generative");
 const { agent: BrowserableAgent } = require("./browserable");
 const { agent: DeepResearchAgent } = require("./deepresearch");
 const { sendEmail } = require("../services/email");
+const { z } = require("zod");
+const { zodResponseFormat } = require("openai/helpers/zod");
 const {
     createFlow,
     updateRunStatus,
@@ -344,6 +346,7 @@ async function updateRunKeyVal({ runId, data }) {
 
 // schedule a looper for a node
 async function scheduleNodeLooper({
+    input,
     runId,
     threadId,
     nodeId,
@@ -367,7 +370,10 @@ async function scheduleNodeLooper({
             `SELECT input FROM browserable.nodes WHERE id = $1`,
             [nodeId]
         );
-        const input = nodes[0].input;
+
+        if (!input) {
+            input = nodes[0].input;
+        }
 
         const agent = agentMap[agentCode];
         await agent._looper({
@@ -1746,6 +1752,37 @@ ${JSON.stringify(dtSchema, null, 2)}`,
             description: "Rows that user wants from this task.",
         });
 
+        const jsonSchema = z.object({
+            outputGenerated: z.object({
+                summary: z.string(),
+                report: z.string(),
+                rows: z.array(
+                    z.object({
+                        ...dtSchema
+                            .map((x) => ({
+                                [x.key]:
+                                    x.type === "markdown"
+                                        ? z.string()
+                                        : x.type === "number"
+                                        ? z.number()
+                                        : x.type === "boolean"
+                                        ? z.boolean()
+                                        : x.type === "string"
+                                        ? z.string()
+                                        : z.string(),
+                            }))
+                            .reduce(
+                                (acc, curr) => ({
+                                    ...acc,
+                                    ...curr,
+                                }),
+                                {}
+                            ),
+                    })
+                ),
+            }),
+        });
+
         let structuredOutput = await createDetailedOutputForNode({
             runId,
             nodeId,
@@ -1754,6 +1791,7 @@ ${JSON.stringify(dtSchema, null, 2)}`,
             output,
             userId: run.user_id,
             useHistory: true,
+            jsonSchema: zodResponseFormat(jsonSchema, "outputGenerated"),
         });
 
         if (structuredOutput && structuredOutput.summary) {
@@ -2733,7 +2771,7 @@ async function decideAgent({ runId, preferredNodeId }) {
                         content: [
                             {
                                 type: "text",
-                                text: `Starting decision node analysis.`,
+                                text: `Analyzing the task and deciding next steps.`,
                                 associatedData: [
                                     {
                                         type: "code",
@@ -2747,7 +2785,7 @@ async function decideAgent({ runId, preferredNodeId }) {
                                                     ? "Yes"
                                                     : "No",
                                         },
-                                        name: "Decision Node Analysis Inputs",
+                                        name: "Inputs",
                                     },
                                 ],
                             },
@@ -2765,8 +2803,8 @@ async function decideAgent({ runId, preferredNodeId }) {
                     runId,
                     nodeId: node.id,
                     status: shortlistedDocument
-                        ? "Analyzing the selected row and determining next steps..."
-                        : "Analyzing the task and determining next steps...",
+                        ? "Analyzing the selected row and determining next steps."
+                        : "Analyzing the task and determining next steps.",
                     input_wait: null,
                     trigger_wait: null,
                 });
@@ -2781,7 +2819,7 @@ async function decideAgent({ runId, preferredNodeId }) {
                             content: [
                                 {
                                     type: "text",
-                                    text: `Starting agent decision process.`,
+                                    text: `Determining next steps.`,
                                     associatedData: [
                                         {
                                             type: "code",
@@ -2795,7 +2833,7 @@ async function decideAgent({ runId, preferredNodeId }) {
                                                     : "",
                                                 availableAgents,
                                             },
-                                            name: "Agent Decision Process Inputs",
+                                            name: "Inputs",
                                         },
                                     ],
                                 },
@@ -2848,30 +2886,6 @@ async function decideAgent({ runId, preferredNodeId }) {
                         accountId: run.account_id,
                     },
                     max_attempts: 5,
-                });
-
-                await updateNodeDebugLog({
-                    runId,
-                    threadId,
-                    nodeId: node.id,
-                    messages: [
-                        {
-                            role: "assistant",
-                            content: [
-                                {
-                                    type: "text",
-                                    text: "Decided to pick the following agent.",
-                                    associatedData: [
-                                        {
-                                            type: "code",
-                                            code: response,
-                                            name: "Agent Decision Process Output",
-                                        },
-                                    ],
-                                },
-                            ],
-                        },
-                    ],
                 });
 
                 const {
@@ -2954,6 +2968,30 @@ async function decideAgent({ runId, preferredNodeId }) {
                         }
                     );
                 } else if (availableAgents[agentCode]) {
+                    await updateNodeDebugLog({
+                        runId,
+                        threadId,
+                        nodeId: node.id,
+                        messages: [
+                            {
+                                role: "assistant",
+                                content: [
+                                    {
+                                        type: "text",
+                                        text: "Decided on an agent.",
+                                        associatedData: [
+                                            {
+                                                type: "code",
+                                                code: response,
+                                                name: "Agent Decision Process Output",
+                                            },
+                                        ],
+                                    },
+                                ],
+                            },
+                        ],
+                    });
+
                     const { task } = aiData;
 
                     await updateRunAgentLog({

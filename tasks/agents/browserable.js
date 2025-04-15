@@ -28,6 +28,7 @@ const textSchema = z.object({
 const HEURISTIC_CHAR_WIDTH = 5;
 
 async function ensureWebviewJSInjected(page) {
+    // Inject into main frame
     const isInjected = await page.evaluate(() => {
         return window.webviewJSInjected === true;
     });
@@ -756,7 +757,22 @@ function pickChunk(chunksSeen) {
 window.pickChunk = pickChunk;
 
 
+function getChunksInfo() {
+  const viewportHeight = window.innerHeight;
+  const documentHeight = document.documentElement.scrollHeight;
+  const totalChunks = Math.ceil(documentHeight / viewportHeight);
+  const chunksArray = Array.from({ length: totalChunks }, (_, i) => i);
 
+  const currentScrollPosition = window.scrollY;
+  const currentChunk = Math.floor(currentScrollPosition / viewportHeight);
+
+
+  return { 
+    currentChunk,
+    totalChunks,
+  };
+}
+window.getChunksInfo = getChunksInfo;
 
 
 
@@ -2466,9 +2482,12 @@ async function verifyActionCompletion({
     runId,
     nodeId,
     threadId,
+    expectationFromAction,
 }) {
     if (!completed) {
-        return false;
+        return {
+            completed: false,
+        };
     }
 
     const isRunActive = await jarvis.isRunActive({
@@ -2477,7 +2496,9 @@ async function verifyActionCompletion({
     });
 
     if (!isRunActive) {
-        return false;
+        return {
+            completed: false,
+        };
     }
 
     await waitForSettledDom(page);
@@ -2500,7 +2521,9 @@ async function verifyActionCompletion({
     });
 
     if (!isRunActive2) {
-        return false;
+        return {
+            completed: false,
+        };
     }
 
     let actionCompleted = false;
@@ -2516,6 +2539,7 @@ async function verifyActionCompletion({
             privateImageUrl,
             threadId,
             jarvis,
+            expectationFromAction,
         });
 
         await jarvis.updateNodeDebugLog({
@@ -2589,7 +2613,9 @@ async function verifyActionCompletion({
             });
 
             if (!isRunActive3) {
-                return false;
+                return {
+                    completed: false,
+                };
             }
 
             const { outputString: domElementsAll } =
@@ -2672,16 +2698,27 @@ async function verifyActionCompletion({
             actionCompleted = verifyResponseAll.completed;
 
             if (!actionCompleted) {
-                return false;
+                return {
+                    completed: false,
+                    reason: verifyResponseAll.reason,
+                };
             }
 
-            return true;
+            return {
+                completed: true,
+                reason: verifyResponseAll.reason,
+            };
         }
 
-        return true;
+        return {
+            completed: true,
+            reason: verifyResponse.reason,
+        };
     }
 
-    return true;
+    return {
+        completed: true,
+    };
 }
 
 async function domExtractHelper({
@@ -3204,7 +3241,14 @@ async function getTotalChunks(page) {
     return Math.ceil(totalHeight / viewportHeight);
 }
 
-async function screenshotHelper({ page, runId, nodeId, jarvis, threadId }) {
+async function screenshotHelper({
+    page,
+    runId,
+    nodeId,
+    jarvis,
+    threadId,
+    scaleDown,
+}) {
     try {
         const isRunActive = await jarvis.isRunActive({
             runId,
@@ -3222,14 +3266,25 @@ async function screenshotHelper({ page, runId, nodeId, jarvis, threadId }) {
         await waitForSettledDom(page);
 
         // Set viewport size
-        await page.setViewportSize({ width: 1920, height: 1920 });
+        await page.setViewportSize({
+            width: Number(process.env.BROWSER_WIDTH),
+            height: Number(process.env.BROWSER_HEIGHT),
+        });
 
         // Take screenshot
-        const screenshot = await page.screenshot({
+        let screenshot = await page.screenshot({
             type: "jpeg",
             quality: 90,
             timeout: 90000,
         });
+
+        if (scaleDown) {
+            screenshot = await resizeImage({
+                image: screenshot,
+                width: scaleDown.width,
+                height: scaleDown.height,
+            });
+        }
 
         // Upload to S3
         const uploadResult = await uploadFileToS3({
@@ -3279,6 +3334,792 @@ async function screenshotHelper({ page, runId, nodeId, jarvis, threadId }) {
     }
 }
 
+async function simpleActionHelper({
+    browser,
+    context,
+    action,
+    expectationFromAction,
+    jarvis,
+    runId,
+    nodeId,
+    threadId,
+    tabId,
+    mainTask,
+}) {
+    let plannerAttempts = 0;
+    const MAX_PLANNER_ATTEMPTS = 10;
+    const STEPS_BEFORE_REPLANNING = 5;
+    let steps = [];
+    let stepsPerformedSinceLastPlan = 0;
+    let currentHighLevelSteps = [];
+    let currentGoal = null;
+    let challenges = [];
+
+    const { tabs, tabsString } = await getBrowserTabsAndMetaInformation({
+        context,
+    });
+    const tab = tabs.find((tab) => tab.tabId === tabId);
+    if (!tab) {
+        return {
+            success: false,
+            message: `Tab with ID ${tabId} not found.`,
+        };
+    }
+    const page = await context.pages()[tab.index];
+
+    async function runPlanner({
+        screenshot,
+        currentChunk,
+        totalChunks,
+        currentChunkDom,
+    }) {
+        plannerAttempts++;
+        if (plannerAttempts > MAX_PLANNER_ATTEMPTS) {
+            return {
+                type: "error",
+                highLevelSteps: [],
+                stateAnalysis: "Max planner attempts exceeded",
+                progressPercentage: 100,
+                challenges: [],
+                explanation: "Max planner attempts exceeded",
+            };
+        }
+
+        /*
+        Current chunk: ${currentChunk + 1}
+        Total chunks: ${totalChunks}
+
+        - nextChunk: number or null. The next chunk to read. If you decide, you need to see more of the page to make a decision, set this to the relevant chunk number.
+
+        nextChunk usage:
+If you decide to read the next/prev chunk, then you can skip challenges and highLevelSteps.
+If you think the action is complete, then you can set progressPercentage to 100, highLevelSteps to an empty array, and nextChunk to null.
+If you think the action is not possible at all, then you can set progressPercentage to 0, highLevelSteps to an array with ["error"], and explanation to the reason why.
+
+                        "nextChunk (number or null), " +
+        */
+
+        const plannerResponse = await callOpenAICompatibleLLMWithRetry({
+            messages: [
+                {
+                    role: "system",
+                    content:
+                        "You are a planner analyzing the current state of a webpage and determining the next steps. " +
+                        "Respond with a JSON object containing: " +
+                        "stateAnalysis (string), " +
+                        "progressPercentage (number), " +
+                        "challenges (array of strings), " +
+                        "highLevelSteps (array of strings), " +
+                        "and explanation (string).",
+                },
+                {
+                    role: "user",
+                    content: `
+Main parent task: ${mainTask}
+Your task to complete: ${action}
+Expected outcome: ${expectationFromAction}
+Current chunk DOM: ${currentChunkDom}
+Steps performed so far: ${JSON.stringify(steps)}
+
+Return a JSON object with the following fields:
+- stateAnalysis: string. A description of the current state of the webpage.
+- progressPercentage: number. The percentage of the action that has been completed. (0-100)
+- challenges: array of strings. The challenges and roadblocks you anticipate in completing the action.
+- highLevelSteps: array of strings. The high-level steps to perform next. max 3-4 steps are ideal. 
+- explanation: string. An explanation of the current state and the next steps.
+
+
+progressPercentage usage:
+- If you think the action is complete, then you can set progressPercentage to 100, highLevelSteps to an empty array
+- If you think the action is not possible at all, then you can set progressPercentage to 0, highLevelSteps to an array with ["error"], and explanation to the reason why.
+
+explanation usage:
+- Fill this always to explain your reasoning.
+
+stateAnalysis usage:
+- Fill this always to explain the current state of the webpage.
+`,
+                },
+                {
+                    role: "user",
+                    content: [
+                        {
+                            type: "image_url",
+                            image_url: {
+                                url: screenshot,
+                            },
+                        },
+                    ],
+                },
+            ],
+            models: [
+                "gemini-2.0-flash",
+                "deepseek-chat",
+                "claude-3-5-sonnet",
+                "gpt-4o",
+                "qwen-plus",
+            ],
+            metadata: {
+                runId,
+                nodeId,
+                agentCode: this.CODE,
+                usecase: "action_planner",
+                flowId: jarvis.flow_id,
+                accountId: jarvis.account_id,
+                threadId,
+            },
+            max_attempts: 3,
+        });
+
+        // If planner wants to change chunks, that's the only action we return
+        // if (
+        //     plannerResponse.nextChunk !== null &&
+        //     plannerResponse.nextChunk !== currentChunk + 1
+        // ) {
+        //     return {
+        //         type: "chunk_change",
+        //         targetChunk: plannerResponse.nextChunk,
+        //     };
+        // }
+
+        if (plannerResponse.progressPercentage === 100) {
+            return {
+                type: "end",
+                highLevelSteps: [],
+                stateAnalysis: "Action completed successfully",
+                progressPercentage: 100,
+                explanation: plannerResponse.explanation,
+            };
+        }
+
+        if (
+            plannerResponse.progressPercentage === 0 &&
+            plannerResponse.highLevelSteps.length === 1 &&
+            plannerResponse.highLevelSteps[0] === "error"
+        ) {
+            return {
+                type: "error",
+                explanation: plannerResponse.explanation,
+            };
+        }
+
+        return {
+            type: "continue",
+            highLevelSteps: plannerResponse.highLevelSteps,
+            stateAnalysis: plannerResponse.stateAnalysis,
+            progressPercentage: plannerResponse.progressPercentage,
+            challenges: plannerResponse.challenges,
+            explanation: plannerResponse.explanation,
+        };
+    }
+
+    async function runner({
+        highLevelSteps,
+        challenges,
+        screenshot,
+        currentChunk,
+        totalChunks,
+        currentChunkDom,
+        previousGoal = null,
+        mainTask,
+    }) {
+        /*
+                                nextChunk (number or null), 
+
+
+                                Current chunk: ${currentChunk + 1}/${totalChunks}
+Previous goal: ${previousGoal || "none"}
+
+- nextChunk: number or null. The next chunk to read. If you decide, you need to see more of the page to make a decision, set this to the relevant chunk number.
+
+WHEN TO USE THE NEXT CHUNK:
+- If you think you need to scroll the page up or down to perform more actions. Then set nextChunk to the next chunk to read.
+- If you are happy with where the page is currently at, then don't set nextChunk. there is no need to unnecessarily read more of the page.
+- DO NOT CHANGE CHUNK UNLESS YOU ARE SURE THAT YOU NEED TO. ALMOST ALWAYS YOU WILL NOT NEED TO CHANGE CHUNK.
+
+        */
+        const runnerResponse = await callOpenAICompatibleLLMWithRetry({
+            messages: [
+                {
+                    role: "system",
+                    content: `
+                        You are a runner that analyzes the current state of a webpage, the previous goal, previous work so far, the high-level steps and decides what to do next. 
+                        Respond with a JSON object containing: 
+                        previousGoalAnalysis (string),
+                        goal (string or null), 
+                        playwrightMethod (string or null), 
+                        playwrightArgs (array or null),
+                        playwrightElement (number or null).
+
+                        previousGoalAnalysis: string. A description of the analysis of the previous goal. If the previous goal is achieved or not and why. 
+
+                        If you think the action is complete, then you can set goal to "end", playwrightMethod to null, and playwrightArgs to null.
+                        If you think the action is not possible at all, then you can set goal to "error", playwrightMethod to null, and playwrightArgs to null.
+                        `,
+                },
+                {
+                    role: "user",
+                    content: `
+Main task: ${mainTask}
+High level sub steps relavant to you: ${highLevelSteps.join("\n")}
+Challenges and roadblocks: ${challenges.join("\n")}
+Current chunk DOM: ${currentChunkDom}
+Previous work so far: ${JSON.stringify(steps)}
+
+RETURN A JSON OBJECT WITH THE FOLLOWING FIELDS:
+- thinking: Explain your thought process in a detailed manner.
+- previousGoalAnalysis: string. A description of the analysis of the previous goal. If the previous goal is achieved or not and why. 
+- goal: string or null. The next goal to achieve.
+- playwrightMethod: string or null. The playwright method to use.
+- playwrightArgs: Arguments to pass to the playwright method. Array.
+- playwrightElement: number or null. The element number to act on.
+
+
+goal usage:
+- If you think the action is complete, then you can set goal to "end".
+- If you think the action is not possible at all, then you can set goal to "error".
+- In all other cases, set goal to the next goal to achieve.
+
+previousGoalAnalysis usage:
+- Fill this always to explain the analysis of the previous goal.
+                    `,
+                },
+                {
+                    role: "user",
+                    content: [
+                        {
+                            type: "image_url",
+                            image_url: {
+                                url: screenshot,
+                            },
+                        },
+                    ],
+                },
+            ],
+            models: [
+                "gemini-2.0-flash",
+                "deepseek-chat",
+                "claude-3-5-sonnet",
+                "gpt-4o",
+                "qwen-plus",
+            ],
+            metadata: {
+                runId,
+                nodeId,
+                agentCode: this.CODE,
+                usecase: "action_runner",
+                flowId: jarvis.flow_id,
+                accountId: jarvis.account_id,
+                threadId,
+            },
+            max_attempts: 3,
+        });
+
+        // If runner wants to change chunks, that's the only action we return
+        // if (
+        //     runnerResponse.nextChunk !== null &&
+        //     runnerResponse.nextChunk !== currentChunk + 1
+        // ) {
+        //     return {
+        //         type: "chunk_change",
+        //         targetChunk: runnerResponse.nextChunk,
+        //         goal: "Change viewport",
+        //     };
+        // }
+
+        if (runnerResponse.goal === "end") {
+            return {
+                type: "end",
+                goal: "End",
+            };
+        }
+
+        if (runnerResponse.goal === "error") {
+            return {
+                type: "error",
+            };
+        }
+
+        if (
+            !runnerResponse.playwrightMethod &&
+            !runnerResponse.playwrightArgs &&
+            !runnerResponse.playwrightElement
+        ) {
+            // consider this as done
+            return {
+                type: "end",
+                goal: "End",
+            };
+        }
+
+        return {
+            type: "action",
+            goal: runnerResponse.goal,
+            method: runnerResponse.playwrightMethod,
+            args: runnerResponse.playwrightArgs,
+            element: runnerResponse.playwrightElement,
+            previousGoalAnalysis: runnerResponse.previousGoalAnalysis,
+        };
+    }
+
+    async function performStep({
+        method,
+        args,
+        goal,
+        element,
+        selectorMap,
+        outputString,
+        currentChunk,
+        totalChunks,
+    }) {
+        const initialUrl = page.url();
+        const xpaths = selectorMap[element];
+        // Get the element text from the outputString
+        const elementLines = outputString.split("\n");
+        const elementText =
+            elementLines
+                .find((line) => line.startsWith(`${element}:`))
+                ?.split(":")[1] || "";
+
+        let foundXpath = null;
+        let locator = null;
+
+        for (const xp of xpaths) {
+            const candidate = page.locator(`xpath=${xp}`).first();
+            try {
+                // Try a short wait to see if it's attached to the DOM
+                await candidate.waitFor({
+                    state: "attached",
+                    timeout: 2000,
+                });
+                foundXpath = xp;
+                locator = candidate;
+                break;
+            } catch (e) {
+                console.log(e);
+            }
+        }
+
+        // If no XPath was valid, we cannot proceed
+        if (!foundXpath || !locator) {
+            // not possible to perform the action.
+            return {
+                success: false,
+                message: "None of the provided XPaths could be located.",
+            };
+        }
+
+        await _performPlaywrightMethod({
+            method,
+            args,
+            xpath: foundXpath,
+            page,
+            context,
+        });
+
+        await waitForSettledDom(page);
+        const newUrl = page.url();
+
+        return {
+            urlChanged: newUrl !== initialUrl,
+            oldUrl: initialUrl,
+            newUrl: newUrl,
+            success: true,
+        };
+    }
+
+    try {
+        await waitForSettledDom(page);
+
+        // Main action loop
+        while (true) {
+            const chunksInfo = await getChunksInfo(page);
+            const { outputString, selectorMap } = await processCurrentChunk(
+                page
+            );
+            const { currentChunk, totalChunks } = chunksInfo;
+
+            const { success, imageUrl, privateImageUrl } =
+                await screenshotHelper({
+                    page,
+                    runId,
+                    nodeId,
+                    jarvis,
+                    threadId,
+                });
+
+            // Call planner if needed
+            if (
+                currentHighLevelSteps.length === 0 ||
+                stepsPerformedSinceLastPlan >= STEPS_BEFORE_REPLANNING
+            ) {
+                await jarvis.updateNodeUserLog({
+                    runId,
+                    nodeId,
+                    threadId,
+                    messages: [
+                        {
+                            role: "assistant",
+                            content: [
+                                {
+                                    type: "text",
+                                    text: "Planning next step.",
+                                },
+                            ],
+                        },
+                    ],
+                });
+
+                const plannerResult = await runPlanner({
+                    currentChunk,
+                    totalChunks,
+                    screenshot: privateImageUrl,
+                    currentChunkDom: outputString,
+                });
+
+                await jarvis.updateNodeUserLog({
+                    runId,
+                    nodeId,
+                    threadId,
+                    messages: [
+                        {
+                            role: "assistant",
+                            content: [
+                                {
+                                    type: "text",
+                                    text:
+                                        "Planner result. Progress percentage: " +
+                                        plannerResult.progressPercentage,
+                                    associatedData: [
+                                        {
+                                            type: "code",
+                                            code: plannerResult,
+                                            name: "Planner result",
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
+                    ],
+                });
+
+                await jarvis.updateNodeDebugLog({
+                    runId,
+                    nodeId,
+                    threadId,
+                    messages: [
+                        {
+                            role: "assistant",
+                            content: [
+                                {
+                                    type: "text",
+                                    text: `${
+                                        plannerResult.explanation
+                                            ? `Planner: ${plannerResult.explanation}`
+                                            : "Planner result"
+                                    }`,
+                                    associatedData: [
+                                        {
+                                            type: "code",
+                                            code: plannerResult,
+                                            name: "Planner result",
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
+                    ],
+                });
+
+                // if (plannerResult.type === "chunk_change") {
+                //     // Handle chunk change
+                //     await scrollToChunk(page, plannerResult.targetChunk);
+                //     await waitForSettledDom(page);
+
+                //     continue;
+                // } else
+                if (plannerResult.type === "end") {
+                    return {
+                        success: true,
+                        message: `Action completed successfully. ${plannerResult.explanation}`,
+                        steps,
+                    };
+                } else if (plannerResult.type === "error") {
+                    return {
+                        success: false,
+                        message: `Action failed. ${plannerResult.explanation}`,
+                        steps,
+                    };
+                }
+
+                stepsPerformedSinceLastPlan = 0;
+                currentHighLevelSteps = plannerResult.highLevelSteps;
+            } else {
+                await jarvis.updateNodeUserLog({
+                    runId,
+                    nodeId,
+                    threadId,
+                    messages: [
+                        {
+                            role: "assistant",
+                            content: [
+                                {
+                                    type: "text",
+                                    text: "Deciding how to perform the high level steps.",
+                                    associatedData: [
+                                        {
+                                            type: "code",
+                                            code: {
+                                                currentHighLevelSteps,
+                                                challenges,
+                                            },
+                                            name: "Steps to perform",
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
+                    ],
+                });
+
+                // we call runner with the highLevelSteps, challenges, explanation, currentChunk, totalChunks, currentChunkDom, previousGoal
+                const runnerResult = await runner({
+                    highLevelSteps: currentHighLevelSteps,
+                    challenges,
+                    currentChunk,
+                    totalChunks,
+                    screenshot: privateImageUrl,
+                    currentChunkDom: outputString,
+                    previousGoal: currentGoal,
+                });
+
+                currentGoal = runnerResult.goal;
+
+                const {
+                    goal,
+                    method,
+                    args,
+                    element,
+                    previousGoalAnalysis,
+                    type,
+                    targetChunk,
+                } = runnerResult;
+
+                await jarvis.updateNodeUserLog({
+                    runId,
+                    nodeId,
+                    threadId,
+                    messages: [
+                        {
+                            role: "assistant",
+                            content: [
+                                {
+                                    type: "text",
+                                    text: `${
+                                        runnerResult.type === "chunk_change"
+                                            ? "Decided to change chunk"
+                                            : runnerResult.type === "end"
+                                            ? "Runner completed the action"
+                                            : runnerResult.type === "error"
+                                            ? "Runner failed to complete the action"
+                                            : "Decided on next sub-goal and how to perform it."
+                                    }`,
+                                    associatedData: [
+                                        {
+                                            type: "code",
+                                            code: runnerResult,
+                                            name: "Goal",
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
+                    ],
+                });
+
+                await jarvis.updateNodeDebugLog({
+                    runId,
+                    nodeId,
+                    threadId,
+                    messages: [
+                        {
+                            role: "assistant",
+                            content: [
+                                {
+                                    type: "text",
+                                    text: `${
+                                        runnerResult.type === "chunk_change"
+                                            ? "Decided to change chunk"
+                                            : runnerResult.type === "end"
+                                            ? "Runner completed the action"
+                                            : runnerResult.type === "error"
+                                            ? "Runner failed to complete the action"
+                                            : "Decided on next sub-goal and how to perform it."
+                                    }`,
+                                    associatedData: [
+                                        {
+                                            type: "code",
+                                            code: runnerResult,
+                                            name: "Goal",
+                                        },
+                                        {
+                                            type: "markdown",
+                                            markdown: previousGoalAnalysis,
+                                            name: "Previous goal analysis",
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
+                    ],
+                });
+
+                // if (type === "chunk_change") {
+                //     // Handle chunk change
+                //     await scrollToChunk(page, targetChunk);
+                //     await waitForSettledDom(page);
+                //     currentGoal = null;
+                //     currentHighLevelSteps = [];
+                //     continue;
+                // } else
+                if (runnerResult.type === "end") {
+                    currentGoal = null;
+                    currentHighLevelSteps = [];
+                    continue;
+                } else if (runnerResult.type === "error") {
+                    currentGoal = null;
+                    currentHighLevelSteps = [];
+                    continue;
+                } else if (type === "action") {
+                    // Perform the step
+                    stepsPerformedSinceLastPlan++;
+
+                    await jarvis.updateNodeUserLog({
+                        runId,
+                        nodeId,
+                        threadId,
+                        messages: [
+                            {
+                                role: "assistant",
+                                content: [
+                                    {
+                                        type: "text",
+                                        text: `Performing step. Goal: ${goal} Method: ${method}. Element: ${element}.`,
+                                    },
+                                ],
+                            },
+                        ],
+                    });
+
+                    await jarvis.updateNodeDebugLog({
+                        runId,
+                        nodeId,
+                        threadId,
+                        messages: [
+                            {
+                                role: "assistant",
+                                content: [
+                                    {
+                                        type: "text",
+                                        text: `Performing step. Goal: ${goal} Method: ${method}. Element: ${element}.`,
+                                        associatedData: [
+                                            {
+                                                type: "code",
+                                                code: {
+                                                    goal,
+                                                    method,
+                                                    element,
+                                                    selectorMap,
+                                                    outputString,
+                                                },
+                                                name: "Goal",
+                                            },
+                                        ],
+                                    },
+                                ],
+                            },
+                        ],
+                    });
+
+                    // if method, goal, element, args are not null, then perform the step
+                    if (method && goal && element && args) {
+                        // Perform the step
+                        const stepResult = await performStep({
+                            method,
+                            args,
+                            goal,
+                            element,
+                            selectorMap,
+                            outputString,
+                        });
+
+                        await jarvis.updateNodeUserLog({
+                            runId,
+                            nodeId,
+                            threadId,
+                            messages: [
+                                {
+                                    role: "assistant",
+                                    content: [
+                                        {
+                                            type: "text",
+                                            text: `Performed: ${goal} ${
+                                                stepResult.message || ""
+                                            }`,
+                                        },
+                                    ],
+                                },
+                            ],
+                        });
+
+                        await jarvis.updateNodeDebugLog({
+                            runId,
+                            nodeId,
+                            threadId,
+                            messages: [
+                                {
+                                    role: "assistant",
+                                    content: [
+                                        {
+                                            type: "text",
+                                            text: `Performed: ${goal} ${
+                                                stepResult.message || ""
+                                            }`,
+                                        },
+                                    ],
+                                },
+                            ],
+                        });
+
+                        const { success, message, urlChanged, oldUrl, newUrl } =
+                            stepResult;
+
+                        steps.push(
+                            `Action ${method} to achieve ${goal} is performed. ${
+                                message || ""
+                            }`
+                        );
+
+                        if (urlChanged) {
+                            steps.push(
+                                `URL changed from ${oldUrl} to ${newUrl}`
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error(error);
+        return {
+            success: false,
+            message: `Action failed: ${error.message}`,
+            steps,
+        };
+    }
+}
+
+// Works well with CUA type models
 async function actHelperWithVision({
     browser,
     context,
@@ -3291,53 +4132,6 @@ async function actHelperWithVision({
     steps = [],
     attempt = 0,
 }) {
-    // shortlisted user recipes
-    // const recipes = [
-    //     {
-    //         name: "Connection request",
-    //         stepsUserPerformed: [
-    //             "Opened URL: https://www.linkedin.com/in/tina-mcdowell-3281025/",
-    //             "Description of URL in context of the task: Profile of a user",
-    //             "Clicked on the 'Connect' button",
-    //             "Confirmed that the request was sent by seeing the 'Pending' badge on the request button",
-    //         ],
-    //     },
-    //     {
-    //         name: "Connection request",
-    //         stepsUserPerformed: [
-    //             "Opened URL: https://www.linkedin.com/in/clarence-lim-91b37b102/",
-    //             "Description of URL in context of the task: Profile of a user",
-    //             "Clicked on the 'Connect' button",
-    //             "Clicked on 'Send without a note' button",
-    //             "Confirmed that the request was sent by seeing the 'Pending' badge on the request button",
-    //         ],
-    //     },
-    //     {
-    //         name: "Connection request",
-    //         stepsUserPerformed: [
-    //             "Opened URL: https://www.linkedin.com/in/tina-mcdowell-3281025/",
-    //             "Description of URL in context of the task: Profile of a user",
-    //             "Clicked on the 'More' button",
-    //             "Scrolled down the page",
-    //             "Clicked on 'Connect' button",
-    //             "Clicked on 'Send without a note' button",
-    //             "Confirmed that the request was sent by seeing the 'Pending' badge on the request button",
-    //         ],
-    //     },
-    // ];
-
-    /*
-    User has previously performed the following steps to achieve similar actions:
-${recipes
-    .map(
-        (recipe, index) => `### Recipe ${index + 1}:  
-Name: ${recipe.name}
-Steps: ${recipe.stepsUserPerformed.join(", ")}
-`
-    )
-    .join("\n\n")}
-    */
-
     try {
         const { tabs, tabsString } = await getBrowserTabsAndMetaInformation({
             context,
@@ -3345,8 +4139,8 @@ Steps: ${recipe.stepsUserPerformed.join(", ")}
 
         // let width = 1279;
         // let height = 632;
-        let width = 1920;
-        let height = 1920;
+        let width = 1092;
+        let height = 1092;
         let lastStepImageUrl = null;
         // if steps is not empty, check if the last step has an image_url
         if (steps.length > 0 && steps[steps.length - 1].image_url) {
@@ -3404,17 +4198,56 @@ Steps: ${recipe.stepsUserPerformed.join(", ")}
                 success: arguments.completed,
                 message: `Action ${
                     arguments.completed ? "completed" : "failed"
-                }: ${reason}`,
+                }: ${reason}. Read the tab to confirm if the task is completed visually and to decide how to proceed.`,
             };
         }
 
         let textResult = "";
         let imageResult = null;
         let privateImageResult = null;
-        // let scaleXAmount = 1279 / width;
-        // let scaleYAmount = 632 / height;
-        let scaleXAmount = 1920 / width;
-        let scaleYAmount = 1920 / height;
+        let scaleXAmount = Number(process.env.BROWSER_WIDTH) / width;
+        let scaleYAmount = Number(process.env.BROWSER_HEIGHT) / height;
+
+        await jarvis.updateNodeUserLog({
+            runId,
+            nodeId,
+            threadId,
+            messages: [
+                {
+                    role: "assistant",
+                    content: [
+                        {
+                            type: "text",
+                            text: `Performing action: ${function_name}.`,
+                        },
+                    ],
+                },
+            ],
+        });
+
+        await jarvis.updateNodeDebugLog({
+            runId,
+            nodeId,
+            threadId,
+            messages: [
+                {
+                    role: "assistant",
+                    content: [
+                        {
+                            type: "text",
+                            text: `Performing action: ${function_name}.`,
+                            associatedData: [
+                                {
+                                    type: "code",
+                                    code: response,
+                                    name: "Response",
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        });
 
         // perform the action.
         if (function_name === "click") {
@@ -3554,6 +4387,10 @@ Steps: ${recipe.stepsUserPerformed.join(", ")}
                         runId,
                         nodeId,
                         jarvis,
+                        scaleDown: {
+                            width,
+                            height,
+                        },
                     });
 
                 if (success) {
@@ -3765,57 +4602,59 @@ async function actHelper({
 
         const { function_name, arguments } = response;
 
-        await jarvis.updateNodeDebugLog({
-            runId,
-            nodeId,
-            threadId,
-            messages: [
-                {
-                    role: "assistant",
-                    content: [
-                        {
-                            type: "text",
-                            text: `Code written to perform the action. ${
-                                arguments.completed
-                                    ? "Expecting this step to complete the action."
-                                    : "This is only a part of the action to achieve user's goal."
-                            }`,
-                            associatedData: [
-                                {
-                                    type: "code",
-                                    code: {
-                                        function_name,
-                                        arguments,
+        if (function_name === "doAction") {
+            await jarvis.updateNodeDebugLog({
+                runId,
+                nodeId,
+                threadId,
+                messages: [
+                    {
+                        role: "assistant",
+                        content: [
+                            {
+                                type: "text",
+                                text: `Code written to perform the action. ${
+                                    arguments.completed
+                                        ? "Expecting this step to complete the action."
+                                        : "This is only a part of the action to achieve user's goal."
+                                }`,
+                                associatedData: [
+                                    {
+                                        type: "code",
+                                        code: {
+                                            function_name,
+                                            arguments,
+                                        },
+                                        name: "Code",
                                     },
-                                    name: "Code",
-                                },
-                            ],
-                        },
-                    ],
-                },
-            ],
-        });
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            });
 
-        await jarvis.updateNodeUserLog({
-            runId,
-            nodeId,
-            threadId,
-            messages: [
-                {
-                    role: "assistant",
-                    content: [
-                        {
-                            type: "text",
-                            text: `Decided how to perform the action. ${
-                                arguments.completed
-                                    ? "Expecting this step to complete the action."
-                                    : "This is only a part of the action to achieve user's goal."
-                            }`,
-                        },
-                    ],
-                },
-            ],
-        });
+            await jarvis.updateNodeUserLog({
+                runId,
+                nodeId,
+                threadId,
+                messages: [
+                    {
+                        role: "assistant",
+                        content: [
+                            {
+                                type: "text",
+                                text: `Decided how to perform the action. ${
+                                    arguments.completed
+                                        ? "Expecting this step to complete the action."
+                                        : "This is only a part of the action to achieve user's goal."
+                                }`,
+                            },
+                        ],
+                    },
+                ],
+            });
+        }
 
         const isRunActive5 = await jarvis.isRunActive({
             runId,
@@ -3840,21 +4679,24 @@ async function actHelper({
                         ? `Reason: ${arguments.reason}\n`
                         : "");
 
-                const actionCompleted = await verifyActionCompletion({
-                    completed: arguments.completed,
-                    action,
-                    steps,
-                    page,
-                    jarvis,
-                    runId,
-                    nodeId,
-                    threadId,
-                    expectationFromAction,
-                });
+                const { completed: actionCompleted, reason: actionReason } =
+                    await verifyActionCompletion({
+                        completed: arguments.completed,
+                        action,
+                        steps,
+                        page,
+                        jarvis,
+                        runId,
+                        nodeId,
+                        threadId,
+                        expectationFromAction,
+                    });
 
                 if (!actionCompleted) {
                     if (chunksSeen.length + 1 < chunks.length) {
                         chunksSeen.push(chunk);
+
+                        steps += `  Reason: ${actionReason}\n`;
 
                         return actHelper({
                             browser,
@@ -3874,7 +4716,7 @@ async function actHelper({
                     } else {
                         return {
                             success: false,
-                            message: `Action was not able to be completed.`,
+                            message: `Action was not able to be completed. ${actionReason}`,
                             action,
                         };
                     }
@@ -4007,17 +4849,18 @@ async function actHelper({
                     };
                 }
 
-                const actionCompleted = await verifyActionCompletion({
-                    completed: arguments.completed,
-                    action,
-                    steps,
-                    page,
-                    jarvis,
-                    runId,
-                    nodeId,
-                    expectationFromAction,
-                    threadId,
-                });
+                const { completed: actionCompleted } =
+                    await verifyActionCompletion({
+                        completed: arguments.completed,
+                        action,
+                        steps,
+                        page,
+                        jarvis,
+                        runId,
+                        nodeId,
+                        expectationFromAction,
+                        threadId,
+                    });
 
                 await jarvis.updateNodeUserLog({
                     runId,
@@ -4064,6 +4907,12 @@ async function actHelper({
                     action: action,
                 };
             }
+        } else if (function_name === "actionCompleted") {
+            return {
+                success: true,
+                message: `Action completed successfully: ${steps}${arguments.step}`,
+                action: action,
+            };
         }
     } catch (error) {
         await jarvis.updateNodeDebugLog({
@@ -4131,9 +4980,7 @@ async function _performPlaywrightMethod({
             //         delay: Math.random() * 50 + 25,
             //     });
             // }
-            await page.keyboard.type(text, {
-                delay: Math.random() * 50 + 25,
-            });
+            await page.keyboard.type(text);
         } catch (e) {
             console.error(e);
             throw Error(e.message);
@@ -4244,6 +5091,14 @@ async function _performPlaywrightMethod({
     }
 
     await waitForSettledDom(page);
+}
+
+async function getChunksInfo(page) {
+    await ensureWebviewJSInjected(page);
+
+    return await page.evaluate(() => {
+        return window.getChunksInfo();
+    });
 }
 
 async function scrollToChunk(page, chunk) {
@@ -4497,8 +5352,10 @@ Rules:
 - Give this agent clear instructions with as much details as possible.
 - If this agent is given a task to do, it will do it in a new browser session. So if there's continuity required, then make sure to provide full task details so that the agent can do it in the same browser session.
 - Technically using open_new_tab, read_tab, act_on_tab & extract_from_tab any complex interaction with a browser is possible. So unless you are absolutely sure that the task cannot be done using open_new_tab, read_tab, act_on_tab & extract_from_tab, then use this agent as long as we are working on a website.
-- Not every task requires an action. Some of them might already be done. So before performing an action, confirm by extracting the content from the page whether the task is already done/ can be done/ needed.
+- Not every task requires an action. Some of them might already be done. So before performing an action, confirm by extracting the content from the page or reading the page whether the task is already done/ can be done/ needed.
 - Few tasks might require multiple action and extractions with different schemas, strategies and attempts. So be patient and try as many different strategies as possible.
+- After every act_on_tab, the next step **must be** a read_tab to visually confirm the result of the action before proceeding.
+- Do not assume the action succeeded just because the act_on_tab call returned success.
 
 Navigation strategies:
 - The tasks might involve finding and navigating multiple pages. So use act, screenshot, extract, read, in loops until some strategy succeeds.
@@ -4510,7 +5367,11 @@ IMPORTANT BLOCKERS:
 - If you hit a login page, then ask the user to complete the login manually and tell you via text once its done. Once the user confirms that the login is compelte, you can start the task again.
 - Deeply analyze the task at every point. Especially once you decide only extraction is left. Since there might be MULTIPLE actions you need to do before you can extract the data. Ex: if the user wants few filters on the page, then you need to perform all the filters before you can extract the data.
 - Make sure you are not hallucinating. You are not relying on your own past information and that you are relying on existing data from browsing (dom + images).
-- Some times the results might be truncated and full results might be available by interacting with the website (ex: see more buttons). So if you think you need to see the full result to solve user's problem, then figure out the full result by interacting with the page and then extracting the data. If you have all the details, then you can skip going through all the pages. Take the call based on the user's problem and website context.`,
+- Some times the results might be truncated and full results might be available by interacting with the website (ex: see more buttons). So if you think you need to see the full result to solve user's problem, then figure out the full result by interacting with the page and then extracting the data. If you have all the details, then you can skip going through all the pages. Take the call based on the user's problem and website context.
+
+SPECIAL ELEMENTS:
+- DROPDOWNS: Some input boxes are dropdowns. And the dropdowns open up after you type something first. You will have to make sure you type something + select the option from the dropdown to complete the action. Just typing the option won't work.
+`,
 
             input: {
                 parameters: {
@@ -4610,7 +5471,10 @@ IMPORTANT BLOCKERS:
             read_tab: {
                 description: `Screenshots a tab at current chunk/ scroll position + returns the image and DOM data of the current chunk. 
 - Use this when you need to decide strategy on how to proceed with a task or when you need to confirm your strategy or when you need to decide new strategy.
-- If you need more context on the page, then call read_tab with with the next chunk number (chunk number is 0 by default. when you call it once, you will get the first fold + how many chunks are present in the page so you can decide to read the next fold or not).`,
+- If you need more context on the page, then call read_tab with with the next chunk number (chunk number is 0 by default. when you call it once, you will get the first fold + how many chunks are present in the page so you can decide to read the next fold or not).
+- After every act_on_tab, the next step **must be** a read_tab to visually confirm the result of the action before proceeding.
+- You MUST always confirm success of previous interaction via read_tab if it's a UI input. Only proceed with the next field/action once you visually verify the prior one.
+`,
                 input: {
                     parameters: {
                         tabId: "string",
@@ -4651,13 +5515,15 @@ IMPORTANT BLOCKERS:
 - IMPORTANT: instead of saying Click on 'Connect'. Say click on a button that sends a request to connect. 
 - Use exact text only if you know the exact text of the element. 
 - Don't use it for opening new tabs or urls. Use open_new_tab for that. 
-- This function works on the tab directly and not on the browser. So only use this for in-tab actions.`,
+- This function works on the tab directly and not on the browser. So only use this for in-tab actions.
+- USE THIS FUNCTION FOR ATOMIC ACTIONS. DONT USE IT FOR COMPLEX ACTIONS (OR MULTIPLE ACTIONS AT ONCE.)
+`,
                 input: {
                     parameters: {
                         action: "string. The action to perform on the tab.",
                         tabId: "string. The id of the tab to perform the action on. You would find this in the context of the task. Id is the unique id of the tab.",
                         expectationFromAction:
-                            "string. What you expect to happen after the action is performed.",
+                            "string. What you expect to happen after the action is performed. Be detailed as possible. Also explain how this action fits into the overall plan of action.",
                     },
                     required: ["action", "tabId", "expectationFromAction"],
                     types: {
@@ -4684,7 +5550,13 @@ IMPORTANT BLOCKERS:
 - If the page has links, it is almost always a good idea to extract urls in the schema as well. So that to deep down, you can navigate to the exact page you need. And for this you need to set use_text_extract to false.
 - ALWAYS extract once you read the tab and you are roughly sure about the content you need.
 - IF THERE IS AN IMPORTANT URL THAT WILL GIVE ANSWERS INSTEAD OF THE PAGE ITSELF, THEN EXTRACT THE URL AND THEN USE OPEN_NEW_TAB TO NAVIGATE TO THE URL. DONT TRY TO EXTRACT ANSWERS FROM THE PAGE WHICH HAS URL UNLESS YOU SAW THAT THE PAGE HAS THE ANSWERS.
-- EITHER WAY TRY DIFFERENT STRATEGIES TO GET THE ANSWERS.`,
+- EITHER WAY TRY DIFFERENT STRATEGIES TO GET THE ANSWERS.
+
+STRATEGIES FOR DECIDING WHAT SCHEMA TO EXTRACT:
+- Almost always extract the same schema as the data table schema format in which user is expecting the information.
+- This ensures all the information is captured in one go and you don't miss any information.
+- Unless you have a good reason to not do it, always extract the same schema as the data table schema format in which user is expecting the information.
+`,
                 input: {
                     parameters: {
                         tabId: "string. The id of the tab to extract from. You would find this in the context of the task. Id is the unique id of the tab.",
@@ -4727,7 +5599,7 @@ IMPORTANT BLOCKERS:
             // scrape_url: this._action_scrape_url.bind(this),
             process_trigger: this._action_process_trigger.bind(this),
             open_new_tab: this._action_open_new_tab.bind(this),
-            ask_user_to_login: this._action_ask_user_to_login.bind(this),
+            // ask_user_to_login: this._action_ask_user_to_login.bind(this),
             act_on_tab: this._action_act_on_tab.bind(this),
             extract_from_tab: this._action_extract_from_tab.bind(this),
             read_tab: this._action_read_tab.bind(this),
@@ -5008,6 +5880,7 @@ ONLY OUTPUT THE JSON. NO OTHER TEXT.`,
             data: {
                 eventId,
                 planOfAction: plan,
+                mainTask: input,
             },
         });
 
@@ -5255,6 +6128,7 @@ ONLY OUTPUT THE JSON. NO OTHER TEXT.`,
                     });
 
                 await scrollToChunk(page, 0);
+                await cleanupDebug(page);
 
                 await jarvis.updateNodeAgentLog({
                     agentCode: this.CODE,
@@ -5769,7 +6643,7 @@ ${extractedContent}`,
     async _action_act_on_tab({ aiData, threadId, jarvis, runId, nodeId }) {
         const { tabId, action, expectationFromAction } = aiData;
         const nodeInfo = await jarvis.getNodeInfo({ runId, nodeId });
-        const { sessionId, connectUrl } = nodeInfo.private_data;
+        const { sessionId, connectUrl, mainTask } = nodeInfo.private_data;
 
         const { browser, context } = await browserService.getPlaywrightBrowser({
             sessionId,
@@ -5777,22 +6651,32 @@ ${extractedContent}`,
         });
 
         try {
-            const { success, message } = await actHelper({
+            // const { success, message } = await actHelper({
+            //     browser,
+            //     context,
+            //     tabId,
+            //     action,
+            //     expectationFromAction,
+            //     jarvis,
+            //     runId,
+            //     nodeId,
+            //     threadId,
+            // });
+
+            const { success, message, steps } = await simpleActionHelper({
                 browser,
                 context,
-                tabId,
                 action,
                 expectationFromAction,
                 jarvis,
                 runId,
                 nodeId,
                 threadId,
+                tabId,
+                mainTask,
             });
 
-            // const {
-            //     success,
-            //     message
-            // } = await actHelperWithVision({
+            // const { success, message } = await actHelperWithVision({
             //     browser,
             //     context,
             //     action,
@@ -5816,6 +6700,10 @@ ${extractedContent}`,
 **Action**: ${action}`,
                     },
                     { role: "jarvis", content: message },
+                    {
+                        role: "jarvis",
+                        content: `Steps performed: ${JSON.stringify(steps)}`,
+                    },
                 ],
             });
 
@@ -5856,6 +6744,13 @@ ${extractedContent}`,
                                         type: "markdown",
                                         markdown: message,
                                         name: "Message",
+                                    },
+                                    {
+                                        type: "code",
+                                        code: {
+                                            steps,
+                                        },
+                                        name: "Steps",
                                     },
                                 ],
                             },
@@ -6083,23 +6978,18 @@ ${extractedContent}`,
                 await waitForSettledDom(page);
                 await debugDom(page);
 
-                // chunksSeen is the chunks that have been seen so far.
-                // if chunkNumber is 0, then chunksSeen is []
-                // if chunkNumber is 1, then chunksSeen is [0]
-                // if chunkNumber is 2, then chunksSeen is [0, 1]
-                // if chunkNumber is 3, then chunksSeen is [0, 1, 2]
-                const chunksSeen = Array.from(
-                    { length: chunkNumber },
-                    (_, i) => i
+                const chunksInfo = await getChunksInfo(page);
+                const { outputString, selectorMap } = await processCurrentChunk(
+                    page
+                );
+                const { currentChunk, totalChunks } = chunksInfo;
+
+                const chunks = Array.from(
+                    { length: totalChunks },
+                    (_, i) => i + 1
                 );
 
-                const { outputString, selectorMap, chunk, chunks } =
-                    await processDom({
-                        page,
-                        chunksSeen,
-                    });
-
-                await scrollToChunk(page, chunkNumber);
+                await cleanupDebug(page);
 
                 await jarvis.updateNodeAgentLog({
                     agentCode: this.CODE,
@@ -6121,7 +7011,7 @@ ${extractedContent}`,
                         {
                             role: "jarvis",
                             content: `For the tab:
-CURRENT CHUNK: ${chunk}
+CURRENT CHUNK: ${chunkNumber}
 AVAILABLE CHUNKS (VERY IMPORTANT INFORMATION TO DECIDE HOW MANY SCROLLS ARE THERE TO READ: ${chunks.join(
                                 ", "
                             )}`,
@@ -6302,7 +7192,7 @@ ${outputString || "No DOM available"}`,
             threadId,
             input: `${input}
 
-ROUGH PLAN OF ACTION:
+        ROUGH PLAN OF ACTION:
 ${planOfAction}
 
 CURRENT BROWSER TABS:
@@ -6417,7 +7307,7 @@ ${tabsString}
                             associatedData: [
                                 {
                                     type: "markdown",
-                                    text: output,
+                                    markdown: output,
                                     name: "Result",
                                 },
                                 {

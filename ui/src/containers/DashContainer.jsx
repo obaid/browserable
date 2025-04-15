@@ -39,6 +39,22 @@ function Dash(props) {
   const { user, integrations, account } = userState;
 
   let [agents, setAgents] = useState([]);
+  let [localBrowserServiceStatus, setLocalBrowserServiceStatus] =
+    useState("unknown");
+
+  useEffect(() => {
+    const fn = async () => {
+      try {
+        const response = await axios.get(
+          process.env.REACT_APP_LOCAL_BROWSER_SERVICE_URL + "/health"
+        );
+        setLocalBrowserServiceStatus(response.data.status);
+      } catch (error) {
+        setLocalBrowserServiceStatus("unknown");
+      }
+    };
+    fn();
+  }, []);
 
   useEffect(() => {
     setAgents(
@@ -132,7 +148,8 @@ function Dash(props) {
     !!Number(process.env.REACT_APP_SINGLE_USER_MODE) &&
     accountDataFetched &&
     systemBrowserApiKeysMissing &&
-    userBrowserApiKeysMissing;
+    userBrowserApiKeysMissing &&
+    localBrowserServiceStatus !== "ok";
 
   if (token) {
     return (
@@ -159,26 +176,42 @@ function Dash(props) {
                   </div>
                 )}
                 {showBrowserApiKeysBanner && (
-                  <div className="w-full flex flex-col lg:flex-row max-w-xl mb-4 bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                  <div className="w-full flex flex-col max-w-xl mb-4 bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center justify-between">
+                    <div className="flex gap-2 mb-2 items-start">
                       <i className="ri-error-warning-line text-yellow-600"></i>
                       <span className="text-sm text-yellow-800">
-                        Please set up your remote browser API keys from any of
-                        the following providers to start using the application:{" "}
-                        <br />
-                        <ul className="list-disc list-inside">
-                          {/* <li>Browserbase</li> */}
-                          <li>Steel</li>
-                          <li>Hyperbrowser</li>
-                        </ul>
+                        Please start local browser(follow the guide{" "}
+                        <a
+                          href="https://docs.browserable.com/development/local-development"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          here
+                        </a>
+                        ) OR set up your remote browser API keys (Steel/
+                        Hyperbrowser) to start using the application.
                       </span>
                     </div>
-                    <button
-                      onClick={() => navigate(`/dash/${accountId}/settings`)}
-                      className="text-sm ml-auto shrink-0 bg-gray-800 hover:bg-gray-900 text-white px-3 py-1 rounded-md transition-colors duration-150"
-                    >
-                      Set up keys
-                    </button>
+                    <div className="flex w-full gap-2">
+                      <div className="flex-1"></div>
+                      <button
+                        onClick={() => {
+                          window.open(
+                            "https://docs.browserable.com/development/local-development",
+                            "_blank"
+                          );
+                        }}
+                        className="text-sm shrink-0 bg-gray-800 hover:bg-gray-900 text-white px-3 py-0.5 rounded-md transition-colors duration-150"
+                      >
+                        Set up local browser
+                      </button>
+                      <button
+                        onClick={() => navigate(`/dash/${accountId}/settings`)}
+                        className="text-sm shrink-0 bg-gray-800 hover:bg-gray-900 text-white px-3 py-0.5 rounded-md transition-colors duration-150"
+                      >
+                        Set up keys
+                      </button>
+                    </div>
                   </div>
                 )}
                 <h1 className="text-2xl font-black mb-4 tracking-tight">
