@@ -143,6 +143,12 @@ When to pick this action?
 - What are subtasks for each row
 -- each sub task here will work only on the respective row of the data table.
 -- you need to break down the task into sub tasks based on the data table schema while making sure that each sub task works only on the respective row of the data table. Also keep enough information in the subtask so that it can work on that task.
+REGARDING NUMBER OF ROWS:
+- Analyze user's task in detail to understand how many rows are needed. Unless user specificies clearly (like they want 'all' or 'x of them' or equivalent), you can assume the user wants 'a' one row detail.
+- If the user wants many rows of data, they would have mentioned it in the task description. When in doubt, assume user wants one row (i.e err on the lesser data always)
+VAGUE ENTRIES VS PRECISE ENTRIES:
+- Unless the user specifically states that they want exact precise information or provides certain format for the columns. Even if you have generic information, you can assume user's task is complete.
+- Don't over work to find precise information. If user's task is to find a list of items, don't try to find precise information for each item. UNLESS USER EXPLICITLY SPECIFIES OTHERWISE.
 
 
 2. actionCode = "need_more_info_from_data_table"
@@ -185,6 +191,11 @@ Example 1: If user asked to find three authors and research on them but they did
 
 - It's better first to find the authors before deciding to add rows since once you decide to add rows and create placeholders, then the three new tasks will work in silos and might come up with same others.
 - Instead if you first create a subtask to find three author names according to user's filters. then for each author name, you can create the rows with author name and subtask. then each subtask works in its own silo and comes up with unique results. they wont collide since they are working on different author names.
+
+===BE VERY CAREFUL ABOUT THE SUB TASKS YOU CREATE===
+- User might not want all the information we want to provide. Deeply analyze their query. Only create sub tasks that are necessary to fulfill user's details. 
+- If user wants specific information clearly wanted (for which you want to produce a new sub task), user will specify it. 
+- Unless user specifies in the task description, they want a particular column for that row, don't create a subtask to find that column.
 
 ===OUTPUT FORMAT JSON===
 {

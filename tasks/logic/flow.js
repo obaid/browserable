@@ -62,8 +62,6 @@ flowQueue.process("task-creator-job", async (job, done) => {
 
         let columns = [];
 
-        console.log("CHECK THIS", agent_codes);
-
         if (
             agent_codes &&
             agent_codes.length > 0 &&

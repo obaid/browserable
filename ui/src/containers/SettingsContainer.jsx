@@ -18,7 +18,6 @@ import {
   logout,
 } from "../actions";
 import useTreeChanges from "tree-changes-hook";
-import { Switch } from "@headlessui/react";
 import { useDropzone } from "react-dropzone";
 import toast from "react-hot-toast";
 

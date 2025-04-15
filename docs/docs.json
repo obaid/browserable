@@ -29,7 +29,9 @@
             "pages": [
               "development/local-development",
               "development/environment-variables",
-              "development/roadmap"
+              "development/roadmap",
+              "development/cli",
+              "development/troubleshooting"
             ]
           },
           {
@@ -135,7 +137,7 @@
           "icon": "github"
         },
         {
-          "anchor": "Twitter",
+          "anchor": "X/ Twitter",
           "href": "https://x.com/browserable",
           "icon": "twitter"
         },
@@ -143,6 +145,11 @@
           "anchor": "Blog",
           "href": "https://browserable.ai/blog",
           "icon": "newspaper"
+        },
+        {
+          "anchor": "Roadmap",
+          "href": "https://www.browserable.ai/roadmap",
+          "icon": "roadmap"
         }
       ]
     }

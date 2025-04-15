@@ -18,6 +18,7 @@ app.post("/create", async (req, res) => {
     const result = await browserManager.createBrowserInstance();
     res.json(result);
   } catch (error) {
+    console.log("error in createBrowserInstance", error);
     res.status(500).json({
       status: "error",
       message: error.message,
@@ -39,6 +40,7 @@ app.post("/stop", async (req, res) => {
     const result = await browserManager.stopBrowserInstance(uniqueId);
     res.json(result);
   } catch (error) {
+    console.log("error in stopBrowserInstance", error);
     res.status(500).json({
       status: "error",
       message: error.message,
@@ -50,6 +52,7 @@ app.post("/stop", async (req, res) => {
 app.get("/get/:uniqueId", async (req, res) => {
   const { uniqueId } = req.params;
   if (!uniqueId) {
+    console.log("uniqueId is required");
     return res.status(400).json({
       status: "error",
       message: "uniqueId is required",
@@ -60,6 +63,7 @@ app.get("/get/:uniqueId", async (req, res) => {
     const result = await browserManager.getBrowserInstance(uniqueId);
     res.json(result);
   } catch (error) {
+    console.log("error in getBrowserInstance", error);
     res.status(500).json({
       status: "error",
       message: error.message,

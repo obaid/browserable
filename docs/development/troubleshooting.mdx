@@ -1,0 +1,105 @@
+# Troubleshooting Guide
+
+This guide will help you diagnose and fix common issues you might encounter while using Browserable.
+
+## Basic Health Checks
+
+### 1. Checking Service Health
+
+To verify if all services are running properly:
+
+```bash
+docker ps
+```
+
+This will show you the status of all containers. Make sure all services (ui, tasks, mongodb, redis, etc.) are in the "Healthy" state.
+
+### 2. Checking Backend Logs
+
+To check if the backend is running or if there are any errors:
+
+```bash
+docker compose -f deployment.dev.yml exec tasks sh
+pm2 logs
+```
+
+### 3. Restarting Backend Services
+
+If you need to restart the backend services:
+
+```bash
+docker exec -it tasks sh
+pm2 restart all
+pm2 logs
+```
+
+To exit from the container shell:
+- Press `Ctrl + C`
+
+## Common Issues and Solutions
+
+### 1. URL Access Issues
+- **Problem**: `127.0.0.1` not working
+- **Solution**: Use `localhost` instead of `127.0.0.1` for all URLs
+- **Explanation**: Some services and configurations are specifically bound to `localhost`
+
+### 2. Initial Setup Screen Issues
+- **Problem**: Stuck at "initial setup" screen
+- **Solution**: This typically indicates a backend connectivity issue
+- **Troubleshooting Steps**:
+  1. Check backend logs using the commands above
+  2. Verify all services are running with `docker ps`
+  3. Check if the tasks service is healthy at `http://localhost:2003/health`
+
+### 3. Rate Limit Errors
+- **Problem**: Getting 403 or 429 errors
+- **Cause**: API rate limits being exceeded
+- **Solution**: 
+  1. Consider using Gemini API keys for better rate limits and latency
+  2. Check your current API usage in the settings panel
+  3. If using OpenAI, consider upgrading your API tier
+
+### 4. Browser Performance Issues
+- **Problem**: Remote browser is slow or unresponsive
+- **Solution**: Consider using the local browser setup
+- **Steps**:
+  1. Follow the local browser setup guide in the documentation
+  2. Start the local browser service:
+  ```bash
+  cd browser
+  npm install
+  npm start
+  ```
+
+## Common Setup Mistakes
+
+1. **URL Configuration**
+   - Always use `localhost` instead of `127.0.0.1` for all URLs
+   - Ensure you're using the correct ports as specified in the configuration
+
+2. **Environment Variables**
+   - Make sure all required environment variables are set in your `deployment.dev.yml` OR in Admin UI -> API Keys
+   - Check if API keys are properly configured in the settings
+
+3. **Port Conflicts**
+   - Ensure no other services are using the required ports:
+     - UI Server: 2001
+     - Documentation: 2002
+     - Tasks Server: 2003
+     - MongoDB: 27017
+     - Redis: 6379
+     - MinIO: 9000, 9001
+
+4. **Docker Issues**
+   - If containers fail to start:
+     1. Stop all containers: `docker compose -f deployment.dev.yml down`
+     2. Remove all containers: `docker compose -f deployment.dev.yml down -v`
+     3. Rebuild and start: `docker compose -f deployment.dev.yml up --build`
+
+## Getting Help
+
+If you're still experiencing issues:
+
+1. Check the complete logs of the problematic service
+2. Join our [Discord community](https://discord.gg/b6s9fXNjeQ) for real-time support
+3. Report issues on our [GitHub repository](https://github.com/browserable/browserable)

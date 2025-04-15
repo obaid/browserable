@@ -36,6 +36,7 @@ class BrowserManager {
           "--window-position=0,0",
           "--window-size=1920,1920",
           "--no-startup-window",
+          "--start-minimized",
         ],
       });
 
@@ -76,6 +77,7 @@ class BrowserManager {
         message: "Browser instance stopped successfully",
       };
     } catch (error) {
+      console.log("error in stopBrowserInstance", error);
       this.usedPorts.delete(instance.port);
       this.browsers.delete(uniqueId);
       return {

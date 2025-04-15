@@ -3299,13 +3299,37 @@ ${JSON.stringify(aiData, null, 2)}
 
                     // first check how many new documents are there.
                     if (documentsWithSubtasks.length === 0) {
-                        // for now we move to the next node
-                        await decideNextNodePostDocument({
-                            shortlistedDocument: null,
-                            shortlistedDocumentIds: [],
-                            shortlistedDocuments: [],
-                        });
-                        return;
+                        if (documents.length > 0) {
+                            // it updated multiple documents. no more sub tasks required. we are good here.
+                            // update the thread data with the new documents
+                            // and move to the next node
+                            await updateThreadData({
+                                runId,
+                                threadId,
+                                data: {
+                                    shortlistedDocumentIds: documents.map(
+                                        (document) => document.rowId
+                                    ),
+                                    shortlistedDocuments: documents,
+                                },
+                            });
+                            await decideNextNodePostDocument({
+                                shortlistedDocument: null,
+                                shortlistedDocumentIds: documents.map(
+                                    (document) => document.rowId
+                                ),
+                                shortlistedDocuments: documents,
+                            });
+                            return;
+                        } else {
+                            // for now we move to the next node
+                            await decideNextNodePostDocument({
+                                shortlistedDocument: null,
+                                shortlistedDocumentIds: [],
+                                shortlistedDocuments: [],
+                            });
+                            return;
+                        }
                     } else if (documentsWithSubtasks.length === 1) {
                         // we can continue within the same thread.
                         // just need to attach the shortlisted document id to the thread. and run pick-node again.

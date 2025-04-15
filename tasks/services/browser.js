@@ -48,8 +48,6 @@ class BrowserService {
                               }
                           );
 
-                          console.log("response", response);
-
                           const { uniqueId, debuggerUrl } = response.data;
 
                           // Convert localhost to host.docker.internal in wsEndpoint
@@ -97,7 +95,7 @@ class BrowserService {
                       context: async (sessionId) => {
                           return {};
                       },
-                      release: async (sessionId) => {
+                      stop: async (sessionId) => {
                           // Stop browser instance through the API
                           await axios.post(
                               `${this.localBrowserServiceUrl}/stop`,

@@ -6,7 +6,6 @@ import useInterval from "beautiful-react-hooks/useInterval";
 import { useDispatch } from "react-redux";
 import { STATUS } from "../literals";
 import { useNavigate, useParams } from "react-router-dom";
-import { Switch } from "@headlessui/react";
 import AppWrapper from "./AppWraper";
 import { motion } from "motion/react";
 import useTreeChanges from "tree-changes-hook";
@@ -180,9 +179,9 @@ function Dash(props) {
                     <div className="flex gap-2 mb-2 items-start">
                       <i className="ri-error-warning-line text-yellow-600"></i>
                       <span className="text-sm text-yellow-800">
-                        Please start local browser(follow the guide{" "}
+                        Please start local browser (follow the guide{" "}
                         <a
-                          href="https://docs.browserable.com/development/local-development"
+                          href="https://docs.browserable.ai/development/local-development"
                           target="_blank"
                           rel="noopener noreferrer"
                         >
@@ -197,7 +196,7 @@ function Dash(props) {
                       <button
                         onClick={() => {
                           window.open(
-                            "https://docs.browserable.com/development/local-development",
+                            "https://docs.browserable.ai/development/local-development",
                             "_blank"
                           );
                         }}

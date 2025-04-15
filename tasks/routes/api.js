@@ -384,6 +384,7 @@ router.get(
                 delete document._id;
                 delete document.flowId;
                 delete document.accountId;
+                delete document.subTask;
             });
 
             res.json({
@@ -397,8 +398,8 @@ router.get(
                             : runs[0].status === "error"
                             ? "error"
                             : "running",
-                    error: runs[0].error,
-                    output: runs[0].output,
+                    ...(runs[0].error && { error: runs[0].error }),
+                    ...(runs[0].output && { output: runs[0].output }),
                     dataTable: documents,
                 },
             });
