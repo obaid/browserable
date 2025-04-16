@@ -90,6 +90,37 @@
                     "type": "string",
                     "default": "BROWSER_AGENT",
                     "description": "Agent to use for the task"
+                  },
+                  "tools": {
+                    "type": "array",
+                    "description": "List of tools available to the agent",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "description": "Type of tool. Only 'function' is supported currently.",
+                          "example": "function"
+                        },
+                        "function": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "description": "Name of the function"
+                            },
+                            "description": {
+                              "type": "string",
+                              "description": "Description of what the function does"
+                            },
+                            "parameters": {
+                              "type": "object",
+                              "description": "JSON Schema of the function parameters"
+                            }
+                          }
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -357,9 +388,9 @@
                           "description": "Detailed status information about the current state",
                           "example": "processing_page"
                         },
-                        "inputWait": {
+                        "toolCall": {
                           "type": "object",
-                          "description": "Information about any user input being waited on",
+                          "description": "Information about any tool call being waited on",
                           "nullable": true,
                           "example": null
                         },
@@ -604,6 +635,80 @@
                           "nullable": true
                         }
                       }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task/{taskId}/run/tool-input": {
+      "post": {
+        "summary": "Handle Tool Input",
+        "description": "Submit user input for a tool call during task execution",
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "description": "The ID of the task",
+            "schema": {
+              "type": "string",
+              "example": "task_123"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "query",
+            "required": false,
+            "description": "The ID of the run. If not provided, applies to the most recent run.",
+            "schema": {
+              "type": "string",
+              "example": "run_456"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["input"],
+                "properties": {
+                  "input": {
+                    "type": "string",
+                    "description": "The user input for the tool call",
+                    "example": "Yes, proceed with the action"
+                  },
+                  "toolCallId": {
+                    "type": "string",
+                    "description": "Optional ID of the specific tool call to respond to",
+                    "example": "tool_789"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "Indicates if the request was successful",
+                      "example": true
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Error message if the request failed"
                     }
                   }
                 }

@@ -5397,8 +5397,6 @@ SPECIAL ELEMENTS:
     getActions() {
         const baseActions = JSON.parse(JSON.stringify(super.getBaseActions()));
 
-        // baseActions.ask_user_for_input.description = `Ask user for input. This could be a question or series of questions you need user to fill. `;
-
         return {
             ...baseActions,
             // scrape_url: {
@@ -5420,28 +5418,6 @@ SPECIAL ELEMENTS:
             //         required: ["text"],
             //         types: {
             //             text: "string",
-            //         },
-            //     },
-            // },
-            // ask_user_to_login: {
-            //     description:
-            //         "Ask the user to complete the login manually and tell you via text once its done. Once the user confirms that the login is compelte, you can start the task again.",
-            //     input: {
-            //         parameters: {
-            //             url: "string",
-            //         },
-            //         required: ["url"],
-            //         types: {
-            //             url: "string",
-            //         },
-            //     },
-            //     output: {
-            //         parameters: {
-            //             success: "boolean",
-            //         },
-            //         required: ["success"],
-            //         types: {
-            //             success: "boolean",
             //         },
             //     },
             // },
@@ -5599,32 +5575,10 @@ STRATEGIES FOR DECIDING WHAT SCHEMA TO EXTRACT:
             // scrape_url: this._action_scrape_url.bind(this),
             process_trigger: this._action_process_trigger.bind(this),
             open_new_tab: this._action_open_new_tab.bind(this),
-            // ask_user_to_login: this._action_ask_user_to_login.bind(this),
             act_on_tab: this._action_act_on_tab.bind(this),
             extract_from_tab: this._action_extract_from_tab.bind(this),
             read_tab: this._action_read_tab.bind(this),
         };
-    }
-
-    async _action_ask_user_to_login({
-        aiData,
-        jarvis,
-        runId,
-        nodeId,
-        threadId,
-    }) {
-        const { url } = aiData;
-
-        this._action_ask_user_for_input({
-            jarvis,
-            runId,
-            nodeId,
-            threadId,
-            aiData: {
-                question: `Please login to ${url}. Once you are logged in, please let me know so I can proceed with the task.`,
-                allowed_input_types: "text",
-            },
-        });
     }
 
     async _action_scrape_url({ aiData, jarvis, runId, nodeId, threadId }) {

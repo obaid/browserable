@@ -5,6 +5,7 @@ import PresentData from "./PresentData";
 import TextareaAutosize from "react-textarea-autosize";
 import TextLoader from "./TextLoader";
 import Message from "./Message";
+import FormInput from "./FormInput";
 
 function ProjectView({
   flowDetails,
@@ -32,52 +33,37 @@ function ProjectView({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isIframeHovered, setIsIframeHovered] = useState(false);
 
-  const getReport = (data) => {
-    if (Array.isArray(data) && data.length == 1 && data[0].REPORT) {
-      return {
-        type: "markdown",
-        markdown: data[0].REPORT,
-      };
+  const getForm = (toolCall) => {
+    const { tool, toolCallId } = toolCall;
+    const { name, parameters } = tool;
+
+    if (isSubmitting) {
+      return null;
     }
 
-    if (typeof data === "object" && data !== null && data.REPORT) {
-      return {
-        type: "markdown",
-        markdown: data.REPORT,
-      };
-    }
-
-    return null;
-  };
-
-  const cleanFlowData = (data) => {
-    if (data) {
-      let cleanedData = JSON.parse(JSON.stringify(data));
-      // remove the created_at field
-      delete cleanedData.created_at;
-
-      // if data is an array, remove the created_at field from each object
-      if (Array.isArray(cleanedData)) {
-        cleanedData.forEach((item) => {
-          delete item.created_at;
-        });
-      }
-
-      return cleanedData;
-    }
+    return (
+      <div className="flex flex-col gap-2 px-5">
+        <FormInput 
+          formData={parameters}
+          onSubmit={(formattedData) => {
+            handleSubmitUserInput(formattedData);
+          }}
+        />
+      </div>
+    );
   };
 
   return (
     <div className="flex flex-col justify-center items-center h-full overflow-hidden">
       <AnimatePresence>
         {isFullscreen && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.95 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0.95 }}
@@ -158,7 +144,6 @@ function ProjectView({
             </div>
           ) : null}
 
-
           {/* <div
             style={{
               minHeight: 0,
@@ -233,6 +218,8 @@ function ProjectView({
                   </div>
                 ))
               )}
+              {activeRunStatus.data?.runStatus === "tool_call" &&
+                getForm(activeRunStatus.data?.toolCall)}
               {isActive && showThinking && (
                 <div className="block w-full">
                   <div className="block float-left px-4">
@@ -254,24 +241,7 @@ function ProjectView({
             </div>
 
             <div className="p-4">
-              <div className="flex flex-col gap-2 bg-white rounded p-2">
-                <TextareaAutosize
-                  className="w-full border-transparent text-sm focus:border-transparent focus:ring-0 focus:ring-offset-0 resize-none h-24 border-2 border-gray-300 rounded-md p-2"
-                  placeholder={!showSubmitButton ? "" : "Type your message here."}
-                  value={userInput}
-                  disabled={!showSubmitButton}
-                  minRows={1}
-                  maxRows={4}
-                  onChange={(e) => setUserInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleSubmitUserInput();
-                    }
-                  }}
-                  ref={userInputRef}
-                />
+              <div className="flex flex-col gap-2 rounded p-2">
                 <div
                   className="w-full flex cursor-pointer justify-end items-center gap-2"
                   onClick={() => {
@@ -332,35 +302,6 @@ function ProjectView({
                         <>
                           <i className="ri-archive-line"></i>
                           <span>Archive</span>
-                        </>
-                      )}
-                    </motion.div>
-                  )}
-                  {showSubmitButton && (
-                    <motion.div
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleSubmitUserInput();
-                      }}
-                      className={`leading-none bg-gray-800 text-sm cursor-pointer hover:bg-gray-900 text-white px-2 py-1.5 rounded flex items-center justify-center gap-2`}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      transition={{
-                        type: "spring",
-                        stiffness: 400,
-                        damping: 17,
-                      }}
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <i className="ri-loader-2-line animate-spin"></i>
-                          <span>Submitting</span>
-                        </>
-                      ) : (
-                        <>
-                          <i className="ri-corner-down-left-line"></i>
-                          <span>Submit</span>
                         </>
                       )}
                     </motion.div>

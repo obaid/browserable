@@ -118,7 +118,7 @@ function FlowChartView({ flowId }) {
               Level {node.private_data.threadLevel || 0}
             </div>
           </div>
-          <div className="text-xs text-gray-500 mb-2 break-words whitespace-pre-wrap">
+          <div className="text-xs text-gray-500 mb-2 break-all whitespace-pre-wrap">
             {node.input}
           </div>
           <div

@@ -112,22 +112,22 @@ export default {
     };
 
     const mergeAndSortMessages = (messages = [], newMessages = []) => {
-      // Find any messages with inputWaitId in newMessages
-      const inputWaitIds = newMessages
-        .filter((m) => m.messages?.some((msg) => msg.metadata?.inputWaitId))
+      // Find any messages with toolCallId in newMessages
+      const toolCallIds = newMessages
+        .filter((m) => m.messages?.some((msg) => msg.metadata?.toolCallId))
         .flatMap((m) =>
           m.messages
-            .filter((msg) => msg.metadata?.inputWaitId)
-            .map((msg) => msg.metadata.inputWaitId)
+            .filter((msg) => msg.metadata?.toolCallId)
+            .map((msg) => msg.metadata.toolCallId)
         );
 
-      // Filter out messages from current messages that have matching inputWaitIds
+      // Filter out messages from current messages that have matching toolCallIds
       const filteredMessages = messages.filter(
         (message) =>
           !message.messages?.some(
             (msg) =>
-              msg.metadata?.inputWaitId &&
-              inputWaitIds.includes(msg.metadata.inputWaitId)
+              msg.metadata?.toolCallId &&
+              toolCallIds.includes(msg.metadata.toolCallId)
           )
       );
 

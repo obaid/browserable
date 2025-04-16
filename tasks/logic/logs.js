@@ -4,6 +4,7 @@ const axios = require('axios');
 const { Canvas, Image } = require('canvas');
 const { agentQueue } = require('../services/queue');
 const { uploadFileToS3 } = require('../services/s3');
+const db = require('../services/db');
 
 // Helper function to extract image URLs from messages
 function extractImageUrlsFromMessages(messages) {

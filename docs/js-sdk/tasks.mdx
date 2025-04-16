@@ -65,8 +65,8 @@ if (status.success && status.data) {
   console.log('Run status:', status.data.status);
   console.log('Detailed status:', status.data.detailedStatus);
   
-  if (status.data.inputWait) {
-    console.log('Waiting for input:', status.data.inputWait);
+  if (status.data.toolCall) {
+    console.log('Waiting for input:', status.data.toolCall);
   }
 }
 ```
@@ -105,8 +105,8 @@ try {
       }
       
       // Handle input wait states
-      if (status.inputWait) {
-        console.log('Waiting for input:', status.inputWait);
+      if (status.toolCall) {
+        console.log('Waiting for input:', status.toolCall);
       }
     }
   });

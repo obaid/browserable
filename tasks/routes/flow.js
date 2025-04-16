@@ -2,7 +2,12 @@ var express = require("express");
 var router = express.Router();
 var cors = require("cors");
 var { getReadableFromUTCToLocal } = require("../utils/datetime");
-var { createFlow, changeFlowStatus } = require("../logic/flow");
+var {
+    createFlow,
+    changeFlowStatus,
+    getMostRecentRun,
+    getRunStatus,
+} = require("../logic/flow");
 var {
     callOpenAICompatibleLLMWithRetry,
     updateMetadataOfLLMCall,
@@ -49,6 +54,7 @@ router.post(
             initMessage,
             agent = "BROWSER_AGENT",
             accountId,
+            tools = [],
         } = req.body || {};
 
         try {
@@ -92,89 +98,7 @@ ONLY output the JSON, nothing else.`,
                 max_attempts: 4,
             });
 
-            // figure out triggers
-            let triggers = [
-                "once|0|",
-            ];
-
-//             const triggersResponse = await callOpenAICompatibleLLMWithRetry({
-//                 messages: [
-//                     {
-//                         role: "system",
-//                         content: `You are a helpful assistant to figure out the when to run a task.`,
-//                     },
-//                     {
-//                         role: "user",
-//                         content: `Given the following task that user wants to run (user entered in natural language):
-// ------------
-// ${initMessage}
-// ------------
-
-
-// Figure out the when to run the task. (i.e, what all triggers are possible for the task)
-
-// Available triggers are:
-// 1. "once|<delay>|" ---> instantly creates a run with the provided delay. delay is in milliseconds.
-// - Use this if the user asked to run something once. 
-// - Or they asked to run something with a delay.
-// - Or they didn't mention any other trigger at all.
-// 2. "crontab|<crontab_string>|" ---> creates a task with the crontab string to run as long as it is active
-// - Use this if the user asked to run something repeatedly at some specific time/day/routine
-
-// It's mandatory to have at least one trigger. Worst case, you can use "once|0|" as a trigger.
-
-
-// Available triggers for the task:
-// ${getAvailableTriggers({
-//     agent_codes: [agent],
-// })}
-
-// Current date and time at user's timezone: ${getReadableFromUTCToLocal(
-//                             new Date(),
-//                             timezoneOffsetInSeconds
-//                         )}
-
-// Current data and time at server's timezone: ${getReadableFromUTCToLocal(
-//                             new Date(),
-//                             0
-//                         )}
-
-// Timezone:
-// Server is at UTC timezone.
-// User's timezone offset is ${timezoneOffsetInSeconds} seconds.
-
-// Rules:
-// - When creating delay and crontab expressions, you need to take into account the user's timezone offset. and generate the value that server will use.
-// - Ex: If the user's time is 4PM and user says run at 5PM. then delay is 1 hour.
-// - Ex: If the user's time is 4PM and user says run at 3PM. then delay is 25 hours.
-// - Ex: If the user's time is 4PM Monday (and server time is 2PM Monday) and user says run at 5PM every Monday. then crontab is "0 3 * * 1" (notice the 5PM user time is converted to 3PM server time)
-
-// Output format: (JSON)
-// {
-//     "readableDescriptionOfTriggers": "<readableDescriptionOfTriggers>", // describe the triggers in a way that is easy to understand for the user
-//     "triggers": ["trigger1", "trigger2", "trigger3"]
-// }
-
-// ONLY output the JSON, nothing else.`,
-//                     },
-//                 ],
-//                 models: [
-//                     "gemini-2.0-flash",
-//                     "deepseek-chat",
-//                     "deepseek-reasoner",
-//                     "claude-3-5-sonnet",
-//                     "gpt-4o",
-//                     "qwen-plus",
-//                 ],
-//                 metadata: {
-//                     [uniqueKeyInMetadata]: uniqueValInMetadata,
-//                     accountId,
-//                     usecase: "generator",
-//                 },
-//                 max_attempts: 5,
-//             });
-
-            // triggers = triggersResponse.triggers;
+            let triggers = ["once|0|"];
 
             const task = initMessage;
 
@@ -193,6 +117,7 @@ ONLY output the JSON, nothing else.`,
                         agent_codes: [agent],
                         initMessage,
                         readableDescriptionOfTriggers: "Runs once immediately.",
+                        tools: tools || [],
                     },
                 },
             });
@@ -559,11 +484,11 @@ router.post(
 
             if (runs.length > 0) {
                 let runStatus = runs[0].status;
-                let inputWait = runs[0].input_wait;
+                let toolCall = runs[0].input_wait;
                 let liveStatus = runs[0].live_status;
 
-                if (inputWait) {
-                    inputWait.runId = runs[0].id;
+                if (toolCall) {
+                    toolCall.runId = runs[0].id;
                 }
 
                 if (runStatus === "running" && runs[0].working_on_node_id) {
@@ -577,34 +502,36 @@ router.post(
                         liveStatus = nodes[0].live_status;
                     }
 
-                    if (
-                        nodes.length > 0 &&
-                        runStatus !== "ask_user_for_input"
-                    ) {
+                    if (nodes.length > 0 && runStatus !== "tool_call") {
                         runStatus = nodes[0].status;
 
                         if (
                             nodes[0].input_wait &&
-                            nodes[0].status === "ask_user_for_input" &&
+                            nodes[0].status === "tool_call" &&
                             nodes[0].input_wait != "completed"
                         ) {
-                            inputWait = nodes[0].input_wait;
-                            inputWait.nodeId = nodes[0].id;
-                            inputWait.runId = runs[0].id;
+                            toolCall = nodes[0].input_wait;
                         }
                     }
                 }
 
+                if (toolCall) {
+                    // delete nodeId, threadId, runId from toolCall
+                    delete toolCall.nodeId;
+                    delete toolCall.threadId;
+                    delete toolCall.runId;
+                }
+
                 res.json({
                     success: true,
-                    data: { runStatus, inputWait, liveStatus },
+                    data: { runStatus, toolCall, liveStatus },
                 });
             } else {
                 res.json({
                     success: true,
                     data: {
                         runStatus: null,
-                        inputWait: null,
+                        toolCall: null,
                         liveStatus: null,
                     },
                 });
@@ -752,57 +679,45 @@ router.post(
     addUserToRequest,
     checkAccountAccess,
     async (req, res) => {
-        let { run_id, messages, inputWaitId, accountId } = req.body || {};
-
-        try {
-            let user = req.user;
-
-            await processUserInputForRun({
-                runId: run_id,
-                inputWaitId,
-                messages,
-                userId: user.id,
-                accountId,
-            });
-
-            res.json({ success: true });
-        } catch (e) {
-            console.log(e);
-            res.json({ success: false, error: e.message });
-        }
-    }
-);
-
-router.options(
-    "/submit/flow/node/user-input",
-    cors({
-        credentials: true,
-        origin: process.env.CORS_DOMAINS.split(","),
-    })
-);
-router.post(
-    "/submit/flow/node/user-input",
-    cors({
-        credentials: true,
-        origin: process.env.CORS_DOMAINS.split(","),
-    }),
-    addUserToRequest,
-    checkAccountAccess,
-    async (req, res) => {
-        let { node_id, run_id, messages, inputWaitId, accountId } =
+        let { messages, flow_id, toolCallId, accountId } =
             req.body || {};
 
+
         try {
             let user = req.user;
 
-            await processUserInputForNode({
-                nodeId: node_id,
-                runId: run_id,
-                inputWaitId,
-                messages,
-                userId: user.id,
+            // get the latest run of this flow
+            const run_id = await getMostRecentRun({
+                taskId: flow_id,
                 accountId,
             });
+
+            // get the run status
+            const runStatus = await getRunStatus({
+                runId: run_id,
+                accountId,
+                taskId: flow_id,
+                retainToolCallIds: true,
+            });
+
+            if (runStatus.detailedStatus === "tool_call" && runStatus.toolCall.nodeId) {
+                // processUserInputForNode
+                await processUserInputForNode({
+                    nodeId: runStatus.toolCall.nodeId,
+                    runId: run_id,
+                    toolCallId,
+                    messages,
+                });
+            } else if (runStatus.detailedStatus === "tool_call" && !runStatus.toolCall.nodeId) {
+                // processUserInputForRun
+                await processUserInputForRun({
+                    runId: run_id,
+                    toolCallId,
+                    messages,
+                    userId: user.id,
+                    accountId,
+                });
+            }
 
             res.json({ success: true });
         } catch (e) {

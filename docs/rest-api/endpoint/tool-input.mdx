@@ -1,0 +1,27 @@
+---
+title: "Handle Tool Input"
+openapi: "POST /task/{taskId}/run/tool-input"
+description: "Submit user input for a tool call during task execution"
+---
+
+<RequestExample>
+```bash
+curl --request POST \
+  --url 'http://localhost:2003/api/v1/task/task_123/run/tool-input?runId=run_456' \
+  --header 'x-api-key: <your-api-key>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "input": "Yes, proceed with the action",
+    "toolCallId": "tool_789"
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "success": true,
+  "error": null
+}
+```
+</ResponseExample> 

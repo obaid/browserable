@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 
 function Message({ content }) {
   if (typeof content === "string") {
-    return <span className="whitespace-pre-wrap">{content}</span>;
+    return <span className="whitespace-pre-wrap break-all">{content}</span>;
   } else if (Array.isArray(content)) {
     return content.map((c, j) => <Message key={j} content={c} />);
   } else if (typeof content === "object") {
@@ -17,7 +17,7 @@ function Message({ content }) {
     } else if (content.text) {
       return (
         <div>
-          <span className="whitespace-pre-wrap">{content.text}</span>
+          <span className="whitespace-pre-wrap break-all">{content.text}</span>
           {getAssociatedData(content)}
         </div>
       );

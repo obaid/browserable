@@ -400,6 +400,11 @@ async function createFlow({ flow }) {
         status = "active";
     }
 
+    if (metadata.tools) {
+        // for now we only support function calling
+        metadata.tools = metadata.tools.filter((x) => x.type === "function");
+    }
+
     const flowId = crypto.randomUUID();
     const tasksDB = await db.getTasksDB();
 
@@ -966,7 +971,6 @@ async function detailedOutputHelper({
     attempt = 0,
     jsonSchema,
 }) {
-
     // Iteratively go through the messages (with chunking at 10000 tokens) and iteratively call the LLM to get the detailed output and reasoning
     let completed = false;
     let maxTokens = 10000;
@@ -1016,8 +1020,7 @@ async function detailedOutputHelper({
                 const tokens = encode(content).length;
                 currentChunks.push({
                     role:
-                        message.role === "user" ||
-                        message.role === "assistant"
+                        message.role === "user" || message.role === "assistant"
                             ? message.role
                             : "user",
                     content: content,
@@ -1043,7 +1046,7 @@ async function detailedOutputHelper({
             input,
             output,
         });
-        
+
         const response = await callOpenAICompatibleLLMWithRetry({
             messages: promptMessages,
             models: [
@@ -1084,7 +1087,6 @@ async function detailedOutputHelper({
 
     return outputGenerated;
 }
-
 
 async function createDetailedOutputWithMessages({
     messages,
@@ -1252,6 +1254,96 @@ async function updateFlowCreatorStatus({ flowId, status }) {
     };
 }
 
+async function getMostRecentRun({ taskId, accountId }) {
+    const tasksDB = await db.getTasksDB();
+    const { rows: recentRuns } = await tasksDB.query(
+        `SELECT id FROM browserable.runs 
+    WHERE flow_id = $1 AND account_id = $2 
+    ORDER BY created_at DESC LIMIT 1`,
+        [taskId, accountId]
+    );
+    if (recentRuns.length > 0) {
+        return recentRuns[0].id;
+    } else {
+        return null;
+    }
+}
+
+async function getRunStatus({
+    runId,
+    taskId,
+    accountId,
+    retainToolCallIds = false,
+}) {
+    const tasksDB = await db.getTasksDB();
+    // Get run status
+    const { rows: runs } = await tasksDB.query(
+        `SELECT status, input_wait, id, live_status, private_data->>'workingOnNodeId' AS working_on_node_id 
+            FROM browserable.runs 
+            WHERE id = $1 AND flow_id = $2 AND account_id = $3`,
+        [runId, taskId, accountId]
+    );
+
+    if (runs.length === 0) {
+        return {
+            status: null,
+            toolCall: null,
+            liveStatus: null,
+        }
+    }
+
+    let runStatus = runs[0].status;
+    let toolCall = runs[0].input_wait;
+    let liveStatus = runs[0].live_status;
+    let runStatusCopy = runStatus;
+
+    if (runStatus === "running" && runs[0].working_on_node_id) {
+        const { rows: nodes } = await tasksDB.query(
+            `SELECT status, live_status, input_wait, id 
+                FROM browserable.nodes 
+                WHERE run_id = $1 AND id = $2`,
+            [runs[0].id, runs[0].working_on_node_id]
+        );
+
+        if (nodes.length > 0 && nodes[0].live_status) {
+            liveStatus = nodes[0].live_status;
+        }
+
+        if (nodes.length > 0 && runStatus !== "tool_call") {
+            runStatus = nodes[0].status;
+
+            if (
+                nodes[0].input_wait &&
+                nodes[0].status === "tool_call" &&
+                nodes[0].input_wait != "completed"
+            ) {
+                toolCall = nodes[0].input_wait;
+            }
+        }
+    }
+
+    if (toolCall && !retainToolCallIds) {
+        // delete nodeId, threadId, runId from toolCall
+        delete toolCall.nodeId;
+        delete toolCall.threadId;
+        delete toolCall.runId;
+    }
+
+    return {
+        status:
+            runStatusCopy === "completed"
+                ? "completed"
+                : runStatusCopy === "error"
+                ? "error"
+                : runStatusCopy === "pending"
+                ? "scheduled"
+                : "running",
+        detailedStatus: runStatus,
+        toolCall,
+        liveStatus,
+    };
+}
+
 module.exports = {
     createFlow,
     changeFlowStatus,
@@ -1265,4 +1357,6 @@ module.exports = {
     createDetailedOutputWithMessages,
     updateFlowCreatorStatus,
     turnOffFlowIfNoTriggers,
+    getRunStatus,
+    getMostRecentRun
 };

@@ -12,7 +12,45 @@ curl --request POST \
   --header 'Content-Type: application/json' \
   --data '{
     "task": "Monitor a website for price changes",
-    "agent": "BROWSER_AGENT"
+    "agent": "BROWSER_AGENT",
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "form_input",
+          "description": "Use this tool to ask information from the user",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "heading": {
+                "type": "string",
+                "description": "The heading of the form input"
+              },
+              "description": {
+                "type": "string",
+                "description": "The description of the form input"
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "description": "Input field type"
+                    },
+                    "label": {
+                      "type": "string",
+                      "description": "Label text"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
   }'
 ```
 </RequestExample>
