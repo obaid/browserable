@@ -1,3 +1,8 @@
+---
+title: 'CLI'
+description: 'Current development plans and future directions for Browserable'
+---
+
 # CLI Commands
 
 The Browserable CLI provides a simple interface to set up and manage your Browserable development environment. Here's a comprehensive guide to all available commands.
@@ -8,7 +13,7 @@ The CLI is included in the Browserable package. Once you have cloned the reposit
 
 ## Available Commands
 
-### `browserable` or `browserable start`
+### `npx browserable` or `npx browserable start`
 
 This is the default command that sets up and starts all Browserable services.
 
@@ -39,7 +44,7 @@ After running this command, you can access the following services:
 - MinIO S3 Storage: http://localhost:9001
 - Redis Queue System: http://localhost:2003/admin/queues
 
-### `browserable down`
+### `npx browserable down`
 
 This command stops all running Browserable Docker services.
 
@@ -48,11 +53,11 @@ This command stops all running Browserable Docker services.
 1. Stops all Docker containers
 2. Removes containers while preserving data volumes
 
-### `browserable --version`
+### `npx browserable --version`
 
 Displays the current version of the Browserable CLI.
 
-### `browserable --help`
+### `npx browserable --help`
 
 Shows the help menu with all available commands and their descriptions.
 
