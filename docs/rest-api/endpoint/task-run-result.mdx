@@ -4,50 +4,6 @@ openapi: "GET /task/{taskId}/run/result"
 description: "Get the results of a specific task run"
 ---
 
-### Headers
-
-<ParamField header="x-api-key" type="string" required>
-  Your API key for authentication
-</ParamField>
-
-### URL Parameters
-
-<ParamField path="taskId" type="string" required>
-  The ID of the task
-</ParamField>
-
-### Query Parameters
-
-<ParamField query="runId" type="string">
-  The ID of the run. If not provided, returns results of the most recent run.
-</ParamField>
-
-### Response
-
-<ResponseField name="success" type="boolean">
-  Indicates if the request was successful
-</ResponseField>
-
-<ResponseField name="data" type="object">
-  <Expandable title="Properties">
-    <ResponseField name="status" type="string">
-      Status of the run: "scheduled", "running", "completed", or "error"
-    </ResponseField>
-    
-    <ResponseField name="error" type="string">
-      Error message if the run failed
-    </ResponseField>
-    
-    <ResponseField name="output" type="object">
-      Output data from the completed run
-    </ResponseField>
-    
-    <ResponseField name="dataTable" type="array">
-      Array of documents collected during the run
-    </ResponseField>
-  </Expandable>
-</ResponseField>
-
 <RequestExample>
 ```bash
 curl --request GET \

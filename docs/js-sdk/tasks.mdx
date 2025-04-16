@@ -11,8 +11,7 @@ Create a new task using the `createTask` method:
 ```typescript
 const result = await browserable.createTask({
   task: 'find the top trending GitHub repos of the day.',
-  agent: 'BROWSER_AGENT', // Optional
-  triggers: ['once|0|'] // Optional
+  agent: 'BROWSER_AGENT' // Optional
 });
 
 if (result.success && result.data) {
@@ -24,8 +23,7 @@ if (result.success && result.data) {
 ### Task Options
 
 - `task` (required): Natural language description of what you want to automate
-- `agents`: Array of agent types to use (defaults to `['BROWSER_AGENT']`)
-- `triggers`: Array of trigger conditions (defaults to `['once|0|']`)
+- `agent` (optional): Agent to use (defaults to `'BROWSER_AGENT'`)
 
 ## Listing Tasks
 
@@ -67,8 +65,8 @@ if (status.success && status.data) {
   console.log('Run status:', status.data.status);
   console.log('Detailed status:', status.data.detailedStatus);
   
-  if (status.data.inputWait) {
-    console.log('Waiting for input:', status.data.inputWait);
+  if (status.data.toolCall) {
+    console.log('Waiting for input:', status.data.toolCall);
   }
 }
 ```
@@ -107,8 +105,8 @@ try {
       }
       
       // Handle input wait states
-      if (status.inputWait) {
-        console.log('Waiting for input:', status.inputWait);
+      if (status.toolCall) {
+        console.log('Waiting for input:', status.toolCall);
       }
     }
   });
@@ -135,6 +133,33 @@ This method combines status monitoring and result retrieval into a single conven
 4. Return the final result when the task completes
 5. Throw an error if the task times out or fails
 
+### Get Run GIF
+
+Get the GIF recording of a task run. The GIF is automatically generated from browser screenshots taken during task execution:
+
+```typescript
+const gifResult = await browserable.getTaskRunGifStatus(taskId, runId);
+
+if (gifResult.success && gifResult.data) {
+  switch (gifResult.data.status) {
+    case 'completed':
+      console.log('GIF URL:', gifResult.data.url);
+      break;
+    case 'pending':
+      console.log('GIF is still being generated');
+      break;
+    case 'error':
+      console.error('GIF generation failed:', gifResult.data.error);
+      break;
+  }
+}
+```
+
+The GIF generation is an asynchronous process that starts after a task run completes. The status field indicates:
+- `pending`: GIF is being generated
+- `completed`: GIF is ready and can be accessed via the `url` field
+- `error`: GIF generation failed, check the `error` field for details 
+
 ## Stopping Tasks
 
 ### Stop a Task Run
@@ -160,6 +185,8 @@ if (result.success) {
   console.log('Task stopped successfully');
 }
 ```
+
+
 
 ## Error Handling
 
@@ -202,4 +229,4 @@ try {
 2. **Status Monitoring**: Regularly check task status for long-running tasks
 3. **Error Handling**: Always handle errors and edge cases
 4. **Resource Management**: Stop unused tasks to free up resources
-5. **Pagination**: Use pagination for listing tasks and runs to manage large datasets 
+5. **Pagination**: Use pagination for listing tasks and runs to manage large datasets

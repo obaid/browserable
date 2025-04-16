@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const cors = require('cors');
 const { uploadFileToS3 } = require('../services/s3');
+const { createGifFromMessageLogs } = require('../logic/logs');
 
 // Configure multer for memory storage
 const upload = multer({ storage: multer.memoryStorage() });
@@ -13,6 +14,7 @@ router.use(cors({
     credentials: true
 }));
 
+// File upload test endpoint
 router.post('/', upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
@@ -47,6 +49,21 @@ router.post('/', upload.single('file'), async (req, res) => {
         });
     } catch (error) {
         console.error('Test upload error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GIF creation test endpoint
+router.get('/gif/:flowId/:runId', cors({
+    credentials: true,
+    origin: process.env.CORS_DOMAINS.split(','),
+}), async (req, res) => {
+    try {
+        const { flowId, runId } = req.params;
+        const result = await createGifFromMessageLogs({ flowId, runId });
+        res.json(result);
+    } catch (error) {
+        console.error('Test GIF creation error:', error);
         res.status(500).json({ error: error.message });
     }
 });

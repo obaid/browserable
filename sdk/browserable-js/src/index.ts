@@ -9,6 +9,7 @@ import {
   TaskRunResult,
   ApiResponse,
   WaitForRunOptions,
+  TaskRunGifResult,
 } from './types';
 
 export class Browserable {
@@ -137,6 +138,16 @@ export class Browserable {
       // Wait before next poll
       await new Promise(resolve => setTimeout(resolve, pollInterval));
     }
+  }
+
+  /**
+   * Get the GIF status and URL for a task run
+   */
+  async getTaskRunGifStatus(taskId: string, runId?: string): Promise<ApiResponse<TaskRunGifResult>> {
+    const response = await this.client.get<ApiResponse<TaskRunGifResult>>(`/task/${taskId}/run/gif`, {
+      params: { runId },
+    });
+    return response.data;
   }
 }
 

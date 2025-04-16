@@ -26,11 +26,12 @@ import {
   resetFlowMessages,
   archiveFlow,
 } from "../actions";
-import LLMCallsView from '../components/LLMCallsView';
-import DataTableView from '../components/DataTableView';
-import ProjectView from '../components/ProjectView';
-import FlowChartView from '../components/FlowChartView';
-import ReportView from '../components/ReportView';
+import LLMCallsView from "../components/LLMCallsView";
+import DataTableView from "../components/DataTableView";
+import ProjectView from "../components/ProjectView";
+import FlowChartView from "../components/FlowChartView";
+import ReportView from "../components/ReportView";
+import GifView from "../components/GifView";
 
 const axiosInstance = axios.create({
   timeout: 50000,
@@ -165,12 +166,13 @@ function Flow(props) {
   const flowDetails = flows.flowDetailMap[flowId] || {};
   const { changed } = useTreeChanges(flowDetails);
   const creatorStatus = flowDetails.data?.metadata?.creatorStatus;
-  const flowStatus = (flows.flowActiveRunStatusMap[flowId] || {}).data
-    ?.runStatus || creatorStatus;
+  const flowStatus =
+    (flows.flowActiveRunStatusMap[flowId] || {}).data?.runStatus ||
+    creatorStatus;
   const flowSuperStatus = flows.flowDetailMap[flowId]?.data?.status;
   const isActive =
     flowStatus && flowStatus != "completed" && flowStatus != "error";
-  const showThinking = flowStatus !== "ask_user_for_input" || creatorStatus;
+  const showThinking = flowStatus !== "tool_call";
   const [userInput, setUserInput] = useState("");
   const userInputRef = useRef(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -416,8 +418,8 @@ function Flow(props) {
   };
 
   const handleUserInputChange = (e) => {
-    // only accept the input if the flow is in the ask_user_for_input state
-    if (flowStatus === "ask_user_for_input") {
+    // only accept the input if the flow is in the tool_call state
+    if (flowStatus === "tool_call") {
       setUserInput(e.target.value);
     }
   };
@@ -463,56 +465,16 @@ function Flow(props) {
     }
   };
 
-  // const handleFormatResult = async () => {
-  //   if (flowSuperStatus === "inactive") {
-  //     setIsFormatting(true);
-
-  //     const fingerprint = await genFingerprint();
-  //     const { data: res } = await axiosInstance.request(
-  //       `${process.env.REACT_APP_TASKS_PUBLIC_URL}/flow/recreate/structured-output`,
-  //       {
-  //         method: "POST",
-  //         data: {
-  //           accountId,
-  //           fingerprint,
-  //           flowId,
-  //         },
-  //       }
-  //     );
-
-  //     const { success, error } = res;
-
-  //     if (success) {
-  //       toast.success("Result formatted successfully");
-  //     } else {
-  //       toast.error(error);
-  //     }
-
-  //     // refresh the flow details
-  //     dispatch(
-  //       getFlowDataBefore({
-  //         accountId,
-  //         flowId,
-  //         before: Date.now(),
-  //         limit: 20,
-  //         offset: 0,
-  //       })
-  //     );
-
-  //     setIsFormatting(false);
-  //   }
-  // };
-
   const showSubmitButton =
-    flowStatus === "ask_user_for_input" &&
+    flowStatus === "tool_call" &&
     activeRunStatus.data &&
-    activeRunStatus.data.inputWait;
+    activeRunStatus.data.toolCall;
 
-  const handleSubmitUserInput = async () => {
+  const handleSubmitUserInput = async (formattedData) => {
     if (showSubmitButton) {
-      const { inputWaitId, runId, nodeId } = activeRunStatus.data.inputWait;
+      const { toolCallId } = activeRunStatus.data.toolCall;
 
-      if (inputWaitId) {
+      if (toolCallId) {
         setIsSubmitting(true);
         setUserInput("");
 
@@ -524,9 +486,9 @@ function Flow(props) {
               messages: [
                 {
                   role: "user",
-                  content: userInput,
+                  content: JSON.stringify(formattedData),
                   metadata: {
-                    inputWaitId,
+                    toolCallId,
                   },
                 },
               ],
@@ -538,23 +500,20 @@ function Flow(props) {
 
         const fingerprint = await genFingerprint();
         await axiosInstance.request(
-          `${process.env.REACT_APP_TASKS_PUBLIC_URL}/flow/submit/flow/${
-            nodeId ? "node" : "run"
-          }/user-input`,
+          `${process.env.REACT_APP_TASKS_PUBLIC_URL}/flow/submit/flow/run/user-input`,
           {
             method: "POST",
             data: {
               accountId,
               fingerprint,
-              node_id: nodeId,
-              run_id: runId,
-              inputWaitId,
+              flow_id: flowId,
+              toolCallId,
               messages: [
                 {
                   role: "user",
-                  content: userInput,
+                  content: JSON.stringify(formattedData),
                   metadata: {
-                    inputWaitId,
+                    toolCallId,
                   },
                 },
               ],
@@ -628,14 +587,13 @@ function Flow(props) {
     />
   );
 
-  console.log("flowDetails", flowDetails);
-
   const llmtab = <LLMCallsView flowId={flowId} />;
   const dataTableTab = <DataTableView flowId={flowId} />;
   const flowChartTab = <FlowChartView flowId={flowId} />;
   const reportTab = <ReportView flowId={flowId} />;
 
-  const isDeepResearchAgent = flowDetails?.data?.metadata?.agent_codes?.includes("DEEPRESEARCH_AGENT");
+  const isDeepResearchAgent =
+    flowDetails?.data?.metadata?.agent_codes?.includes("DEEPRESEARCH_AGENT");
 
   const tabs = isAdmin
     ? [
@@ -659,11 +617,20 @@ function Flow(props) {
           label: "Results Table",
           component: dataTableTab,
         },
-        ...(isDeepResearchAgent ? [{
-          id: "report",
-          label: "Report",
-          component: reportTab,
-        }] : []),
+        {
+          id: "gif-view",
+          label: "GIF",
+          component: <GifView flowId={flowId} />,
+        },
+        ...(isDeepResearchAgent
+          ? [
+              {
+                id: "report",
+                label: "Report",
+                component: reportTab,
+              },
+            ]
+          : []),
       ]
     : [
         {
@@ -676,11 +643,20 @@ function Flow(props) {
           label: "Results Table",
           component: dataTableTab,
         },
-        ...(isDeepResearchAgent ? [{
-          id: "report",
-          label: "Report",
-          component: reportTab,
-        }] : []),
+        {
+          id: "gif-view",
+          label: "GIF",
+          component: <GifView flowId={flowId} />,
+        },
+        ...(isDeepResearchAgent
+          ? [
+              {
+                id: "report",
+                label: "Report",
+                component: reportTab,
+              },
+            ]
+          : []),
       ];
 
   if (token) {
@@ -696,7 +672,15 @@ function Flow(props) {
                   className={`py-2 font-medium text-sm`}
                   onClick={() => setActiveTab(tab.id)}
                 >
-                  <span className={`text-sm px-3 py-1 rounded ${activeTab === tab.id ? 'text-black bg-gray-100 font-black' : 'text-gray-500 font-medium'}`}>{tab.label}</span>
+                  <span
+                    className={`text-sm px-3 py-1 rounded ${
+                      activeTab === tab.id
+                        ? "text-black bg-gray-100 font-black"
+                        : "text-gray-500 font-medium"
+                    }`}
+                  >
+                    {tab.label}
+                  </span>
                 </button>
               ))}
             </div>

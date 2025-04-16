@@ -6,7 +6,6 @@ export interface BrowserableConfig {
 export interface CreateTaskOptions {
   task: string;
   agent?: string;
-  triggers?: string[];
 }
 
 export interface PaginationOptions {
@@ -28,7 +27,7 @@ export interface TaskRun {
 export interface TaskRunStatus {
   status: 'scheduled' | 'running' | 'completed' | 'error';
   detailedStatus?: string;
-  inputWait?: any;
+  toolCall?: any;
   liveStatus?: any;
 }
 
@@ -37,6 +36,12 @@ export interface TaskRunResult {
   error?: string;
   output?: any;
   dataTable?: any[];
+}
+
+export interface TaskRunGifResult {
+  status: 'pending' | 'error' | 'completed';
+  url?: string;
+  error?: string;
 }
 
 export interface ApiResponse<T> {

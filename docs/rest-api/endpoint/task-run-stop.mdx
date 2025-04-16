@@ -4,30 +4,6 @@ openapi: "PUT /task/{taskId}/run/stop"
 description: "Stop a running task execution"
 ---
 
-### Headers
-
-<ParamField header="x-api-key" type="string" required>
-  Your API key for authentication
-</ParamField>
-
-### URL Parameters
-
-<ParamField path="taskId" type="string" required>
-  The ID of the task
-</ParamField>
-
-### Query Parameters
-
-<ParamField query="runId" type="string">
-  The ID of the run. If not provided, stops the most recent run.
-</ParamField>
-
-### Response
-
-<ResponseField name="success" type="boolean">
-  Indicates if the request was successful
-</ResponseField>
-
 <RequestExample>
 ```bash
 curl --request PUT \

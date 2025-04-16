@@ -47,50 +47,6 @@ class BaseAgent {
                     types: {},
                 },
             },
-            // ask_user_for_input: {
-            //     description: "Ask the user for input. Ask the runner to convey the question to the user and get the input from the user.",
-            //     input: {
-            //         parameters: {
-            //             question: "The question to ask the user",
-            //             allowed_input_types: "The allowed input types",
-            //         },
-            //         required: ["question"],
-            //         types: {
-            //             question: "string",
-            //             allowed_input_types: "string. comma separated string of allowed input types. Allowed are text, image, file, audio, xlsx.",
-            //         },
-            //     },
-            //     output: {
-            //         parameters: {
-            //             answer: "The answer to the question. If the input type is image, file, audio, xlsx, then the answer should be the file url/ id.",
-            //         },
-            //         required: ["answer"],
-            //         types: {
-            //             answer: "string",
-            //         },
-            //     },
-            // },
-            // communicate_information_to_user: {
-            //     description: "Communicate information to the user. This is used to send information to the user. The user sees the information in the UI.",
-            //     input: {
-            //         parameters: {
-            //             information: "The information to communicate to the user",
-            //         },
-            //         required: ["information"],
-            //         types: {
-            //             information: "string",
-            //         },
-            //     },
-            //     output: {
-            //         parameters: {
-            //             success: "A success message that the information has been communicated to the user.",
-            //         },
-            //         required: ["success"],
-            //         types: {
-            //             success: "string",
-            //         },
-            //     },
-            // },
         };
 
         return BASE_ACTIONS;
@@ -100,8 +56,6 @@ class BaseAgent {
         return {
             end: this._action_end.bind(this),
             error: this._action_error.bind(this),
-            // ask_user_for_input: this._action_ask_user_for_input.bind(this),
-            // communicate_information_to_user: this._action_communicate_information_to_user.bind(this),
         };
     }
 
@@ -217,113 +171,6 @@ class BaseAgent {
             status: 'completed',
             output,
             reasoning,
-        });
-    }
-
-    async _action_ask_user_for_input({ jarvis, aiData, runId, nodeId, threadId }) {
-
-        // add to agent log 
-        await jarvis.updateNodeAgentLog({
-            runId,
-            nodeId,
-            messages: [
-                {
-                    role: "assistant",
-                    content: `Asking user for input.
-**Question**: ${aiData.question}
-**Allowed Input Types**: ${aiData.allowed_input_types}`,
-                },
-            ],
-        });
-
-        await jarvis.updateNodeDebugLog({
-            runId,
-            nodeId,
-            threadId,
-            messages: [
-                {
-                    role: "assistant",
-                    content: [
-                        {
-                            type: "text",
-                            text: "Asking user for input.",
-                            associatedData: [
-                                {
-                                    type: "code",
-                                    code: {
-                                        question: aiData.question,
-                                        allowed_input_types: aiData.allowed_input_types,
-                                    },
-                                    name: "Question",
-                                },
-                            ]
-                        }
-                    ]
-                }
-            ]
-        });
-
-        await jarvis.askUserForInputAtNode({
-            runId,
-            nodeId,
-            threadId,
-            question: aiData.question,
-            allowed_input_types: aiData.allowed_input_types || "text",
-        });
-    }
-
-    async _action_communicate_information_to_user({ jarvis, aiData, runId, nodeId, threadId }) {
-        const { information } = aiData;
-
-        await jarvis.communicateInformationToUserAtNode({
-            runId,
-            nodeId,
-            threadId,
-            information,
-        });
-
-        await jarvis.updateNodeAgentLog({
-            agentCode: this.CODE,
-            runId,
-            nodeId,
-            messages: [
-                {
-                    role: "jarvis",
-                    content: `Communicated information to the user.`,
-                },
-            ],
-        });
-
-        await jarvis.updateNodeDebugLog({
-            runId,
-            nodeId,
-            threadId,
-            messages: [
-                {
-                    role: "assistant",
-                    content: [
-                        {
-                            type: "text",
-                            text: "Communicated information to the user.",
-                            associatedData: [
-                                {
-                                    type: "markdown",
-                                    markdown: information,
-                                    name: "Information",
-                                }
-                            ]
-                        }
-                    ]
-                }
-            ]
-        });
-
-        await jarvis.scheduleNodeLooper({
-            runId,
-            nodeId,
-            threadId,
-            agentCode: this.CODE,
-            delay: 0,
         });
     }
 }

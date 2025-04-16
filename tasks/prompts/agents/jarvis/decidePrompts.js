@@ -19,6 +19,7 @@ function buildDecideActionPrompt({
     customInstructions,
     input,
     dtSchema,
+    tools,
 }) {
     return `
 === AGENT DESCRIPTION ===
@@ -32,10 +33,14 @@ ${input}
 === DATA TABLE SCHEMA OF WHAT SCHEMA USER IS EXPECTING THE INFORMATION IN ===
 ${JSON.stringify(dtSchema, null, 2)}
 
-${shortlistedDocuments.length == 0 ? "" : `
+${
+    shortlistedDocuments.length == 0
+        ? ""
+        : `
 === SHORTLISTED DOCUMENTS WITH RELEVANT DATA FOR THIS TASK ===
 ${shortlistedDocuments.map((doc) => JSON.stringify(doc, null, 2)).join("\n")}
-`}
+`
+}
 
 
 === YOUR TASK ===
@@ -69,6 +74,25 @@ ${JSON.stringify(agent.getActions()[id].output, null, 2)}
     .join("\n\n")}
 
 === END OF POSSIBLE ACTIONS ===
+
+${
+    tools.length > 0
+        ? `
+== USER PROVIDED ACTION CODES ==
+${tools
+    .map(
+        (tool) => `== ACTION ${tool.function.name} ==
+actionCode = "${tool.function.name}"
+Description: ${tool.function.description}
+Input aiData parameters aiData of this action: 
+${JSON.stringify(tool.function.parameters, null, 2)}
+Output will be sent back as a string.
+`
+    )
+    .join("\n\n")}
+`
+        : ""
+}
 
 === Current Key Value Data Storage for this task ===
 ${JSON.stringify(nodeData, null, 2)}
@@ -126,29 +150,12 @@ function buildDecideAgentPrompt({
     lastImageMessage,
     userName,
     email,
-    timezoneOffsetInSeconds
+    timezoneOffsetInSeconds,
+    tools,
 }) {
 
     // strip off flow_id and account_id from shortlistedDocument
     const { flow_id, account_id, ...rest } = shortlistedDocument || {};
-
-
-    /*
-    agentCode = "ask_user_for_input"
-If you need some information from user to finish the task.
-aiData for this agent is:
-{
-    "question": "<question>" string question to ask user,
-    "allowed_input_types": "<allowed_input_types>" string. comma separated string of allowed input types. Allowed are text, image, file, audio, xlsx.
-}
-
-agentCode = "communicate_information_to_user"
-If you need to communicate information to the user.
-aiData for this agent is:
-{
-    "information": "<information>" string information to communicate to the user.
-}
-    */
 
     return `
 === AGENT DESCRIPTION ===
@@ -201,6 +208,24 @@ aiData for this agent is:
     "error": "<e>" string error message,
 }
 
+${
+    tools.length > 0
+        ? `
+== USER PROVIDED AGENT CODES ==
+${tools
+    .map(
+        (tool) => `== TOOL ${tool.function.name} ==
+agentCode = "${tool.function.name}"
+Description: ${tool.function.description}
+Input aiData parameters aiData of this tool: 
+${JSON.stringify(tool.function.parameters, null, 2)}
+Output will be sent back as a string.
+`
+    )
+    .join("\n\n")}
+`
+        : ""
+}
 
 === HISTORY OF ALL ACTIONS PERFORMED SO FAR ===
 
@@ -217,9 +242,9 @@ User's timezone offset: ${timezoneOffsetInSeconds}
 
 === UNIVERSE DATA ===
 Current date and time at user's timezone: ${getReadableFromUTCToLocal(
-    new Date(),
-    timezoneOffsetInSeconds
-)}
+        new Date(),
+        timezoneOffsetInSeconds
+    )}
 
 == IMPORTANT ==
 Each agent runs in it's own context. The agents don't have access to each other's context. So you need to pass all the information that the next agent would require to complete the task.
@@ -236,10 +261,9 @@ OUTPUT: (JSON)
     "summaryOfEverythingHappenedSoFar": "<summaryOfEverythingHappenedSoFar> string. Include all the details that the next agent can use to complete the task. This is important.",
 }
 `;
-/* or "ask_user_for_input" or "communicate_information_to_user" */
 }
 
 module.exports = {
     buildDecideActionPrompt,
-    buildDecideAgentPrompt
+    buildDecideAgentPrompt,
 };

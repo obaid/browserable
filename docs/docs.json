@@ -92,7 +92,8 @@
               "rest-api/endpoint/task-runs",
               "rest-api/endpoint/task-run-status",
               "rest-api/endpoint/task-run-result",
-              "rest-api/endpoint/task-run-stop"
+              "rest-api/endpoint/task-run-stop",
+              "rest-api/endpoint/task-run-gif"
             ]
           }
         ]
@@ -148,8 +149,8 @@
         },
         {
           "anchor": "Roadmap",
-          "href": "https://www.browserable.ai/roadmap",
-          "icon": "roadmap"
+          "href": "https://www.browserable.ai/roadmap", 
+          "icon": "map"
         }
       ]
     }

@@ -4,44 +4,6 @@ openapi: "GET /tasks"
 description: "Get a list of all tasks for the authenticated user"
 ---
 
-### Headers
-
-<ParamField header="x-api-key" type="string" required>
-  Your API key for authentication
-</ParamField>
-
-### Query Parameters
-
-<ParamField query="page" type="number" default="1">
-  Page number for pagination
-</ParamField>
-
-<ParamField query="limit" type="number" default="30">
-  Number of tasks per page (max: 30)
-</ParamField>
-
-### Response
-
-<ResponseField name="success" type="boolean">
-  Indicates if the request was successful
-</ResponseField>
-
-<ResponseField name="data" type="array">
-  Array of task objects
-</ResponseField>
-
-<ResponseField name="total" type="number">
-  Total number of tasks
-</ResponseField>
-
-<ResponseField name="page" type="number">
-  Current page number
-</ResponseField>
-
-<ResponseField name="limit" type="number">
-  Number of tasks per page
-</ResponseField>
-
 <RequestExample>
 ```bash
 curl --request GET \

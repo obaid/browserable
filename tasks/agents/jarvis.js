@@ -2,6 +2,7 @@ const { callOpenAICompatibleLLMWithRetry } = require("../services/llm");
 const { agent: GenerativeAgent } = require("./generative");
 const { agent: BrowserableAgent } = require("./browserable");
 const { agent: DeepResearchAgent } = require("./deepresearch");
+const { createGifFromMessageLogs } = require("../logic/logs");
 const { sendEmail } = require("../services/email");
 const { z } = require("zod");
 const { zodResponseFormat } = require("openai/helpers/zod");
@@ -1139,6 +1140,19 @@ async function endRun({ runId, userId, accountId, error, status }) {
         );
         const flowId = runs[0].flow_id;
 
+        if (status === "completed") {
+            // lets start a task job that creates a gif for this run
+            await agentQueue.add(
+                `create-gif`,
+                {
+                    runId,
+                    flowId,
+                    accountId,
+                },
+                { removeOnComplete: true }
+            );
+        }
+
         await turnOffFlowIfNoTriggers({ flowId, accountId, userId });
     }
 }
@@ -1147,24 +1161,11 @@ async function askUserForInputAtRun({
     runId,
     threadId,
     nodeId,
-    question,
-    allowed_input_types,
+    tool,
     userId,
     accountId,
 }) {
-    await updateRunUserLog({
-        runId,
-        threadId,
-        nodeId,
-        messages: [
-            {
-                role: "assistant",
-                content: question,
-            },
-        ],
-    });
-
-    const inputWaitId = generateUUID();
+    const toolCallId = generateUUID();
 
     await updateRunDebugLog({
         runId,
@@ -1176,18 +1177,14 @@ async function askUserForInputAtRun({
                 content: [
                     {
                         type: "text",
-                        text: question,
+                        text: "Tool call.",
                         associatedData: [
                             {
                                 type: "code",
                                 code: {
-                                    question,
-                                    allowed_input_types,
-                                    inputWaitId,
-                                    threadId,
-                                    nodeId,
+                                    tool,
                                 },
-                                name: "Question",
+                                name: "Tool",
                             },
                         ],
                     },
@@ -1198,62 +1195,69 @@ async function askUserForInputAtRun({
 
     await updateRunStatus({
         runId,
-        status: "ask_user_for_input",
+        status: "tool_call",
         error: null,
         output: null,
         reasoning: null,
         userId,
         accountId,
         input_wait: {
-            question,
-            allowed_input_types,
-            inputWaitId,
+            tool,
+            toolCallId,
             threadId,
-            nodeId,
+            runId,
         },
     });
 }
 
-async function askUserForInputAtNode({
-    runId,
-    nodeId,
-    threadId,
-    question,
-    allowed_input_types,
-}) {
-    await updateNodeUserLog({
+async function askUserForInputAtNode({ runId, nodeId, threadId, tool }) {
+    await updateNodeDebugLog({
         runId,
-        nodeId,
         threadId,
+        nodeId,
         messages: [
             {
                 role: "assistant",
-                content: question,
+                content: [
+                    {
+                        type: "text",
+                        text: `Tool call`,
+                        associatedData: [
+                            {
+                                type: "code",
+                                code: {
+                                    tool,
+                                },
+                                name: "Tool",
+                            },
+                        ],
+                    },
+                ],
             },
         ],
     });
 
-    const inputWaitId = generateUUID();
+    const toolCallId = generateUUID();
     await updateNodeStatus({
         runId,
         nodeId,
-        status: "ask_user_for_input",
+        status: "tool_call",
         error: null,
         output: null,
         reasoning: null,
         input_wait: {
-            question,
-            allowed_input_types,
-            inputWaitId,
+            toolCallId,
+            tool,
             threadId,
             nodeId,
+            runId,
         },
     });
 }
 
 async function processUserInputForRun({
     runId,
-    inputWaitId,
+    toolCallId,
     messages,
     userId,
     accountId,
@@ -1264,13 +1268,13 @@ async function processUserInputForRun({
         `SELECT input_wait FROM browserable.runs WHERE id = $1`,
         [runId]
     );
-    const inputWait = runs[0].input_wait;
-    if (inputWait && inputWait.inputWaitId !== inputWaitId) {
+    const toolCall = runs[0].input_wait;
+    if (toolCall && toolCall.toolCallId !== toolCallId) {
         // silent ignore.
         return;
     }
 
-    const { threadId, nodeId } = inputWait;
+    const { threadId, nodeId } = toolCall;
 
     // strip off any metadata from the messages for agent log but keep it in user log
     const messagesWithoutMetadata = messages.map((message) => ({
@@ -1444,7 +1448,7 @@ async function processTriggerForNode({
 async function processUserInputForNode({
     runId,
     nodeId,
-    inputWaitId,
+    toolCallId,
     messages,
 }) {
     // confirm that the input wait id is correct
@@ -1453,8 +1457,8 @@ async function processUserInputForNode({
         `SELECT input_wait, input, thread_id FROM browserable.nodes WHERE id = $1`,
         [nodeId]
     );
-    const inputWait = nodes[0].input_wait;
-    if (inputWait && inputWait.inputWaitId !== inputWaitId) {
+    const toolCall = nodes[0].input_wait;
+    if (toolCall && toolCall.toolCallId !== toolCallId) {
         // silent ignore.
         return;
     }
@@ -1469,6 +1473,7 @@ async function processUserInputForNode({
         runId,
         nodeId,
         messages: messagesWithoutMetadata,
+        threadId: nodes[0].thread_id,
     });
 
     await updateNodeUserLog({
@@ -1989,6 +1994,14 @@ async function decideAction({
         [runId]
     );
 
+    // get flow metadata
+    let { rows: flowMetadata } = await tasksDB.query(
+        `SELECT metadata FROM browserable.flows WHERE id = $1`,
+        [runs[0].flow_id]
+    );
+    flowMetadata = flowMetadata[0].metadata || {};
+    const { tools = [] } = flowMetadata;
+
     const { lastLimitMessages, lastImageMessage } =
         await convertMessageLogsToLLMFormat({
             run_id: runId,
@@ -2065,6 +2078,7 @@ async function decideAction({
         customInstructions,
         input,
         dtSchema,
+        tools,
     });
 
     const response = await callOpenAICompatibleLLMWithRetry({
@@ -2542,7 +2556,7 @@ async function decideAgent({ runId, preferredNodeId }) {
         if (
             run.status === "completed" ||
             run.status === "error" ||
-            run.status === "ask_user_for_input"
+            run.status === "tool_call"
         ) {
             return;
         }
@@ -2556,6 +2570,8 @@ async function decideAgent({ runId, preferredNodeId }) {
         if (flowMetadataRows.length > 0) {
             flowMetadata = flowMetadataRows[0].metadata;
         }
+
+        const tools = flowMetadata.tools || [];
 
         const singleThreadMode =
             !!flowMetadata.agent_codes.includes("DEEPRESEARCH_AGENT");
@@ -2859,6 +2875,7 @@ async function decideAgent({ runId, preferredNodeId }) {
                     userName,
                     email,
                     timezoneOffsetInSeconds,
+                    tools,
                 });
 
                 const response = await callOpenAICompatibleLLMWithRetry({
@@ -2925,48 +2942,6 @@ async function decideAgent({ runId, preferredNodeId }) {
                         status: "error",
                     });
                     return;
-                } else if (agentCode === "ask_user_for_input") {
-                    await updateRunAgentLog({
-                        runId,
-                        threadId,
-                        messages: [
-                            {
-                                role: "assistant",
-                                content: `Decided to ask user following question: ${aiData.question}`,
-                            },
-                        ],
-                    });
-
-                    await askUserForInputAtRun({
-                        runId,
-                        threadId,
-                        nodeId: node.id,
-                        question: aiData.question,
-                        allowed_input_types: aiData.allowed_input_types,
-                        userId: user_id,
-                        accountId: run.account_id,
-                    });
-
-                    return;
-                } else if (agentCode === "communicate_information_to_user") {
-                    await communicateInformationToUserAtRun({
-                        runId,
-                        threadId,
-                        nodeId: node.id,
-                        information: aiData.information,
-                    });
-
-                    // schedule a pick-node again
-                    await agentQueue.add(
-                        `schedule-pick-node`,
-                        {
-                            runId,
-                            nodeId: node.id,
-                        },
-                        {
-                            removeOnComplete: true,
-                        }
-                    );
                 } else if (availableAgents[agentCode]) {
                     await updateNodeDebugLog({
                         runId,
@@ -3071,6 +3046,45 @@ ${JSON.stringify(aiData, null, 2)}
                             removeOnComplete: true,
                         }
                     );
+                    return;
+                } else if (
+                    tools &&
+                    tools.length > 0 &&
+                    tools.filter(
+                        (x) =>
+                            x.type === "function" &&
+                            x.function.name === agentCode
+                    ).length > 0
+                ) {
+                    let toolInput = aiData.parameters || aiData;
+
+                    await updateRunAgentLog({
+                        runId,
+                        threadId,
+                        messages: [
+                            {
+                                role: "assistant",
+                                content: `Decided to use tool: ${agentCode} with following input: ${JSON.stringify(
+                                    toolInput,
+                                    null,
+                                    2
+                                )}`,
+                            },
+                        ],
+                    });
+
+                    await askUserForInputAtRun({
+                        runId,
+                        threadId,
+                        nodeId: node.id,
+                        tool: {
+                            name: agentCode,
+                            parameters: toolInput,
+                        },
+                        userId: user_id,
+                        accountId: run.account_id,
+                    });
+
                     return;
                 } else {
                     await endThread({
@@ -3614,6 +3628,26 @@ ${JSON.stringify(aiData, null, 2)}
     }
 }
 
+agentQueue.process("create-gif", async (job, done) => {
+    const { runId, flowId, accountId } = job.data;
+    const { success, error, gifUrl } = await createGifFromMessageLogs({
+        runId,
+        flowId,
+        accountId,
+    });
+
+    if (success && gifUrl) {
+        // update the gifUrl in the private data of this run
+        await upsertRunPrivateData({
+            runId,
+            data: {
+                gifUrl
+            }
+        });
+    }
+    done();
+});
+
 agentQueue.process("jarvis-queue-job", 4, async (job, done) => {
     const { code, functionToCall, functionArgs } = job.data;
     const agent = agentMap[code];
@@ -4108,6 +4142,14 @@ async function runActionHelper({
             return;
         }
 
+        // get flow metadata
+        let { rows: flowMetadata } = await tasksDB.query(
+            `SELECT metadata FROM browserable.flows WHERE id = $1`,
+            [flowId]
+        );
+        flowMetadata = flowMetadata[0].metadata || {};
+        const { tools = [] } = flowMetadata;
+
         const { rows: nodes } = await tasksDB.query(
             `SELECT agent_code FROM browserable.nodes WHERE id = $1`,
             [nodeId]
@@ -4115,6 +4157,37 @@ async function runActionHelper({
         const agentCode = nodes[0].agent_code;
 
         const agent = agentMap[agentCode];
+
+        if (
+            tools.length > 0 &&
+            tools.filter((tool) => tool.function.name === actionCode).length > 0
+        ) {
+            // then this is a tool_call
+            await updateNodeAgentLog({
+                runId,
+                nodeId,
+                threadId,
+                messages: [
+                    {
+                        role: "assistant",
+                        content: `Asking user for input for tool call ${actionCode} with parameters ${JSON.stringify(
+                            aiData
+                        )}`,
+                    },
+                ],
+            });
+
+            await askUserForInputAtNode({
+                runId,
+                nodeId,
+                threadId,
+                tool: {
+                    name: actionCode,
+                    parameters: aiData,
+                },
+            });
+            return;
+        }
 
         // if the actionCode is not present in agent.getActionFns(), then throw an error
         if (!agent.getActionFns()[actionCode]) {

@@ -58,16 +58,16 @@ function Dash(props) {
   const [sampleTasks] = useState([
     {
       id: 1,
-      task: "Find the top trending GitHub repos of the day"
+      task: "Find the top trending GitHub repos of the day",
     },
     {
       id: 2,
-      task: "Find a Coursera course that teaches Python to beginners"
+      task: "Find a Coursera course that teaches Python to beginners",
     },
     {
       id: 3,
-      task: "Tell me the names of Trump's kids"
-    }
+      task: "Tell me the names of Trump's kids",
+    },
   ]);
 
   useEffect(() => {
@@ -103,6 +103,172 @@ function Dash(props) {
           fingerprint,
           initMessage: story,
           agent: selectedNonGenerativeAgent,
+          tools: [
+            {
+              type: "function",
+              function: {
+                name: "form_input",
+                description: `Use this tool to ask information from the user. This is the only way to get information from the user. And assume that user might not have any other immediate context. So any relevant/ related information user needs can be provided to the user using this.
+When to use this:
+- If you are stuck and you need help from user
+- Captchas that you are not able to solve yourself
+- Logins, Signups etc.
+Rules:
+- Only ask information that you need from a human who doesn't understand your system like tab ids etc.`,
+                parameters: {
+                  type: "object",
+                  properties: {
+                    heading: {
+                      type: "string",
+                      description: "The heading of the form input",
+                    },
+                    description: {
+                      type: "string",
+                      description: "The description of the form input",
+                    },
+                    fields: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          type: {
+                            type: "string",
+                            description:
+                              "What type of input to show to the user",
+                            enum: [
+                              "text",
+                              "number",
+                              "email",
+                              "tel",
+                              "url",
+                              "password",
+                              "date",
+                              "time",
+                              "datetime-local",
+                              "month",
+                              "week",
+                              "textarea",
+                              "select",
+                              "checkbox",
+                              "radio",
+                              "switch",
+                              "range",
+                            ],
+                          },
+                          label: {
+                            type: "string",
+                            description: "Label text for the input field",
+                          },
+                          placeholder: {
+                            type: "string",
+                            description:
+                              "Placeholder text shown when field is empty",
+                          },
+                          defaultValue: {
+                            type: ["string", "number", "boolean"],
+                            description: "Default value for the field",
+                          },
+                          readonly: {
+                            type: "boolean",
+                            description: "Whether the field is read-only",
+                            default: false,
+                          },
+                          required: {
+                            type: "boolean",
+                            description: "Whether the field is required",
+                            default: false,
+                          },
+                          disabled: {
+                            type: "boolean",
+                            description: "Whether the field is disabled",
+                            default: false,
+                          },
+                          min: {
+                            type: "number",
+                            description:
+                              "Minimum value for number/range/date inputs",
+                          },
+                          max: {
+                            type: "number",
+                            description:
+                              "Maximum value for number/range/date inputs",
+                          },
+                          step: {
+                            type: "number",
+                            description: "Step value for number/range inputs",
+                          },
+                          minLength: {
+                            type: "number",
+                            description: "Minimum length for text inputs",
+                          },
+                          maxLength: {
+                            type: "number",
+                            description: "Maximum length for text inputs",
+                          },
+                          pattern: {
+                            type: "string",
+                            description:
+                              "Regular expression pattern for validation",
+                          },
+                          options: {
+                            type: "array",
+                            description:
+                              "Options for select/radio/checkbox inputs",
+                            items: {
+                              type: "object",
+                              properties: {
+                                label: {
+                                  type: "string",
+                                  description: "Display label for the option",
+                                },
+                                value: {
+                                  type: ["string", "number"],
+                                  description: "Value for the option",
+                                },
+                              },
+                            },
+                          },
+                          multiple: {
+                            type: "boolean",
+                            description:
+                              "Allow multiple selections for select input",
+                            default: false,
+                          },
+                          rows: {
+                            type: "number",
+                            description: "Number of rows for textarea",
+                          },
+                          cols: {
+                            type: "number",
+                            description: "Number of columns for textarea",
+                          },
+                          autocomplete: {
+                            type: "string",
+                            description: "Autocomplete attribute value",
+                          },
+                          className: {
+                            type: "string",
+                            description:
+                              "CSS class names to apply to the input",
+                          },
+                        },
+                        required: ["type"],
+                      },
+                    },
+                    submitButton: {
+                      type: "object",
+                      properties: {
+                        label: {
+                          type: "string",
+                          description: "Label text for the submit button",
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          ],
         },
       }
     );
@@ -308,13 +474,15 @@ function Dash(props) {
                   </div>
                 </div>
                 <div className="w-full max-w-xl mt-8">
-                  <p className="text-sm text-gray-600 mb-2 font-bold">Or try one of these sample tasks:</p>
+                  <p className="text-sm text-gray-600 mb-2 font-bold">
+                    Or try one of these sample tasks:
+                  </p>
                   <div className="flex flex-wrap gap-2">
                     {sampleTasks.map((sample) => (
                       <motion.button
                         key={sample.id}
                         onClick={() => setStory(sample.task)}
-                        style={{ border: '1px solid #D1D5DB' }}
+                        style={{ border: "1px solid #D1D5DB" }}
                         className="px-3 py-1 bg-white hover:bg-gray-50 text-gray-700 text-sm rounded-lg transition-colors duration-150 text-left"
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
