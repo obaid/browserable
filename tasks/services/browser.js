@@ -7,7 +7,12 @@ const crypto = require("crypto");
 const { chromium } = require("playwright");
 
 class BrowserService {
-    constructor({ hyperbrowserApiKey, browserbaseApiKey, browserbaseProjectId, steelApiKey } = {}) {
+    constructor({
+        hyperbrowserApiKey,
+        browserbaseApiKey,
+        browserbaseProjectId,
+        steelApiKey,
+    } = {}) {
         this.hyperbrowserClient =
             process.env.HYPER_BROWSER_API_KEY || hyperbrowserApiKey
                 ? new Hyperbrowser({
@@ -23,35 +28,86 @@ class BrowserService {
                           process.env.BROWSERBASE_API_KEY || browserbaseApiKey,
                   })
                 : null;
-        this.browserbaseProjectId = process.env.BROWSERBASE_PROJECT_ID || browserbaseProjectId;
+        this.browserbaseProjectId =
+            process.env.BROWSERBASE_PROJECT_ID || browserbaseProjectId;
 
-        // TODO: (SG) Playwright client is not tested yet.
-        this.playwrightClient = process.env.PLAYWRIGHT_URL
+        this.localBrowserServiceUrl = process.env.LOCAL_BROWSER_SERVICE_URL;
+
+        this.browserableClient = process.env.LOCAL_BROWSER_SERVICE_URL
             ? {
                   sessions: {
                       create: async (options) => {
+                          // Create a new browser instance through the API
+                          const response = await axios.post(
+                              `${this.localBrowserServiceUrl}/create`,
+                              {},
+                              {
+                                  headers: {
+                                      Host: "localhost",
+                                  },
+                              }
+                          );
+
+                          const { uniqueId, debuggerUrl } = response.data;
+
+                          // Convert localhost to host.docker.internal in wsEndpoint
+                          const dockerWsEndpoint = debuggerUrl.replace(
+                              "localhost",
+                              "host.docker.internal"
+                          );
+
                           return {
-                              id: crypto.randomUUID(),
-                              connectUrl: `${process.env.PLAYWRIGHT_WS_URL}`,
-                              liveUrl: `${process.env.PLAYWRIGHT_URL}`,
-                              wsEndpoint: `${process.env.PLAYWRIGHT_WS_URL}`,
+                              id: uniqueId,
+                              connectUrl: dockerWsEndpoint,
+                              liveUrl: "", // Local browser doesn't have a live URL
+                              wsEndpoint: dockerWsEndpoint,
                           };
                       },
                       retrieve: async (sessionId) => {
+                          // Get browser instance status through the API
+                          const response = await axios.get(
+                              `${this.localBrowserServiceUrl}/get/${sessionId}`,
+                              {
+                                  headers: {
+                                      Host: "localhost",
+                                  },
+                              }
+                          );
+                          const data = response.data;
+
+                          let { uniqueId, debuggerUrl, status } = data;
+
+                          if (status === "active") {
+                              debuggerUrl = debuggerUrl.replace(
+                                  "localhost",
+                                  "host.docker.internal"
+                              );
+                          }
+
                           return {
-                              id: sessionId,
-                              connectUrl: `${process.env.PLAYWRIGHT_WS_URL}`,
-                              liveUrl: ``,
-                              wsEndpoint: `${process.env.PLAYWRIGHT_WS_URL}`,
+                              id: uniqueId,
+                              connectUrl: debuggerUrl,
+                              status,
+                              liveUrl: "", // Local browser doesn't have a live URL
+                              wsEndpoint: debuggerUrl,
                           };
                       },
                       context: async (sessionId) => {
                           return {};
                       },
-                      release: async (sessionId) => {
-                          return {
-                              id: sessionId,
-                          };
+                      stop: async (sessionId) => {
+                          // Stop browser instance through the API
+                          await axios.post(
+                              `${this.localBrowserServiceUrl}/stop`,
+                              {
+                                  uniqueId: sessionId,
+                              },
+                              {
+                                  headers: {
+                                      Host: "localhost",
+                                  },
+                              }
+                          );
                       },
                   },
               }
@@ -64,21 +120,15 @@ class BrowserService {
                 : null;
         this.steelApiKey = process.env.STEEL_API_KEY || steelApiKey;
 
-        this.provider = this.playwrightClient
-            ? "playwright"
-            : this.steelClient
+        this.provider = this.steelClient
             ? "steel"
             : this.hyperbrowserClient
             ? "hyperbrowser"
             : this.browserbaseClient
             ? "browserbase"
+            : this.browserableClient
+            ? "browserable"
             : null;
-
-        // By maintaining playwright connections with us, instead of connecting everytime, we are making this faster BUT also losing out on multiple servers handling jobs of a single browser agent.
-        // With keep alive connections, we don't need this but for local development, we need this.
-        // TODO: (SG) Figure out a better way to handle this.
-        this.PLAYWRIGHT_CONNECTIONS = {};
-        this.startStalePlaywrightConnectionsCleanup();
     }
 
     async getCurrentProvider() {
@@ -86,8 +136,8 @@ class BrowserService {
     }
 
     async getNewProfile() {
-        if (this.provider === "playwright") {
-            // PLAYWRIGHT VERSION
+        if (this.provider === "browserable") {
+            // BROWSERABLE VERSION
             const profileId = crypto.randomUUID();
             return profileId;
         } else if (this.provider === "hyperbrowser") {
@@ -108,9 +158,9 @@ class BrowserService {
     }
 
     async getNewSession({ profileId, profileContext }) {
-        if (this.provider === "playwright") {
-            // PLAYWRIGHT VERSION
-            const session = await this.playwrightClient.sessions.create({
+        if (this.provider === "browserable") {
+            // BROWSERABLE VERSION
+            const session = await this.browserableClient.sessions.create({
                 profile: {
                     id: profileId,
                 },
@@ -134,8 +184,8 @@ class BrowserService {
                     persistChanges: true,
                 },
                 screen: {
-                    width: 1920,
-                    height: 1920,
+                    width: Number(process.env.BROWSER_WIDTH),
+                    height: Number(process.env.BROWSER_HEIGHT),
                 },
                 enableWebRecording: true,
             });
@@ -154,8 +204,8 @@ class BrowserService {
                 sessionContext: profileContext || {},
                 sessionId: uniqueId,
                 dimensions: {
-                    width: 1920,
-                    height: 1920,
+                    width: Number(process.env.BROWSER_WIDTH),
+                    height: Number(process.env.BROWSER_HEIGHT),
                 },
                 timeout: 60 * 60 * 1000,
             });
@@ -176,8 +226,8 @@ class BrowserService {
                         persist: true,
                     },
                     viewport: {
-                        width: 1920,
-                        height: 1920,
+                        width: Number(process.env.BROWSER_WIDTH),
+                        height: Number(process.env.BROWSER_HEIGHT),
                     },
                 },
                 // keepAlive: true, // available in starter plan only
@@ -190,9 +240,9 @@ class BrowserService {
     async stopSession({ token, sessionId }) {
         // TODO: (SG) add browserbase support
         try {
-            if (this.provider === "playwright") {
-                // PLAYWRIGHT VERSION
-                await this.playwrightClient.sessions.stop(sessionId);
+            if (this.provider === "browserable") {
+                // BROWSERABLE VERSION
+                await this.browserableClient.sessions.stop(sessionId);
             } else if (this.provider === "hyperbrowser") {
                 // HYPERBROWSER VERSION
                 await this.hyperbrowserClient.sessions.stop(sessionId);
@@ -218,9 +268,9 @@ class BrowserService {
 
     async getSessionById({ sessionId }) {
         // TODO: (SG) add browserbase support
-        if (this.provider === "playwright") {
-            // PLAYWRIGHT VERSION
-            const session = await this.playwrightClient.sessions.retrieve(
+        if (this.provider === "browserable") {
+            // BROWSERABLE VERSION
+            const session = await this.browserableClient.sessions.retrieve(
                 sessionId
             );
             return {
@@ -255,9 +305,6 @@ class BrowserService {
                 wsEndpoint: this.steelApiKey
                     ? `wss://connect.steel.dev?apiKey=${this.steelApiKey}&sessionId=${sessionId}`
                     : `${session.websocketUrl}`,
-                // wsEndpoint: process.env.STEEL_API_KEY
-                //     ? `wss://connect.steel.dev?apiKey=${process.env.STEEL_API_KEY}&sessionId=${sessionId}`
-                //     : `${session.websocketUrl}devtools/browser/${sessionId}`,
             };
         } else if (this.provider === "browserbase") {
             // BROWSERBASE VERSION
@@ -278,6 +325,7 @@ class BrowserService {
     }
 
     async scrape({ url, onlyMainContent = true, formats = ["markdown"] }) {
+        // TODO: (SG) add browserable support
         // TODO: (SG) add browserbase support
         if (this.provider === "hyperbrowser") {
             const scrapeResult =
@@ -312,10 +360,6 @@ class BrowserService {
 
     async getPlaywrightBrowser({ sessionId, connectUrl, attempt = 1 }) {
         try {
-            if (this.PLAYWRIGHT_CONNECTIONS[sessionId]) {
-                return this.PLAYWRIGHT_CONNECTIONS[sessionId];
-            }
-
             const session = await this.getSessionById({
                 sessionId,
             });
@@ -329,15 +373,12 @@ class BrowserService {
 
             if (!context) {
                 context = await browser.newContext({
-                    viewport: { width: 1920, height: 1920 },
+                    viewport: {
+                        width: Number(process.env.BROWSER_WIDTH),
+                        height: Number(process.env.BROWSER_HEIGHT),
+                    },
                 });
             }
-
-            this.PLAYWRIGHT_CONNECTIONS[sessionId] = {
-                browser,
-                context,
-                createdAt: Date.now(),
-            };
 
             return {
                 browser,
@@ -360,39 +401,12 @@ class BrowserService {
         }
     }
 
-    removeStalePlaywrightConnections() {
-        const now = Date.now();
-        Object.keys(this.PLAYWRIGHT_CONNECTIONS).forEach((sessionId) => {
-            if (
-                now - this.PLAYWRIGHT_CONNECTIONS[sessionId].createdAt >
-                60 * 60 * 1000
-            ) {
-                this.closePlaywrightBrowser({ sessionId });
-            }
-        });
-    }
-
-    startStalePlaywrightConnectionsCleanup() {
-        setInterval(() => {
-            this.removeStalePlaywrightConnections();
-        }, 10 * 60 * 1000);
-    }
-
-    async closePlaywrightBrowser({ sessionId }) {
-        if (!this.PLAYWRIGHT_CONNECTIONS[sessionId]) {
-            return;
-        }
-        const { browser, context } = this.PLAYWRIGHT_CONNECTIONS[sessionId];
-        try {
-            await browser.close();
-            await context.close();
-        } catch (error) {
-            console.log("Error closing browser session. Moving on.", error);
-        }
-        delete this.PLAYWRIGHT_CONNECTIONS[sessionId];
-    }
-
-    async resetClients({ hyperbrowserApiKey, browserbaseApiKey, browserbaseProjectId, steelApiKey }) {
+    async resetClients({
+        hyperbrowserApiKey,
+        browserbaseApiKey,
+        browserbaseProjectId,
+        steelApiKey,
+    }) {
         this.hyperbrowserClient =
             process.env.HYPER_BROWSER_API_KEY || hyperbrowserApiKey
                 ? new Hyperbrowser({
@@ -408,7 +422,8 @@ class BrowserService {
                           process.env.BROWSERBASE_API_KEY || browserbaseApiKey,
                   })
                 : null;
-        this.browserbaseProjectId = process.env.BROWSERBASE_PROJECT_ID || browserbaseProjectId;
+        this.browserbaseProjectId =
+            process.env.BROWSERBASE_PROJECT_ID || browserbaseProjectId;
         this.steelClient =
             process.env.STEEL_API_KEY || steelApiKey
                 ? new Steel({
@@ -417,21 +432,21 @@ class BrowserService {
                 : null;
         this.steelApiKey = process.env.STEEL_API_KEY || steelApiKey;
 
-        this.provider = this.playwrightClient
-            ? "playwright"
-            : this.steelClient
+        this.provider = this.steelClient
             ? "steel"
             : this.hyperbrowserClient
             ? "hyperbrowser"
             : this.browserbaseClient
             ? "browserbase"
+            : this.browserableClient
+            ? "browserable"
             : null;
 
         this.client =
-            this.playwrightClient ||
             this.steelClient ||
             this.hyperbrowserClient ||
-            this.browserbaseClient;
+            this.browserbaseClient ||
+            this.browserableClient;
 
         return this.client;
     }

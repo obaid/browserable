@@ -17,6 +17,8 @@ services:
       - ../tasks/package.json:/tasks/package.json
       - ../tasks/files:/tasks/files
     working_dir: /tasks
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "2003:2003"
       - "2010:2010"
@@ -75,7 +77,10 @@ services:
       HYPER_BROWSER_API_KEY:
       BROWSERBASE_API_KEY: 
       BROWSERBASE_PROJECT_ID: 
-      BROWSER_CONCURRENCY: 1
+      BROWSER_CONCURRENCY: 4
+      LOCAL_BROWSER_SERVICE_URL: http://host.docker.internal:9221
+      BROWSER_WIDTH: 1920 # 1280
+      BROWSER_HEIGHT: 1920 # 720
     links:
       - browserable-redis
       - browserable-mongodb
@@ -130,6 +135,7 @@ services:
       REACT_APP_SINGLE_USER_MODE: 1
       SECRET: please-change-this-secret-key
       REACT_APP_COOKIE_UUID_KEY: browserable_uuid
+      REACT_APP_LOCAL_BROWSER_SERVICE_URL: http://localhost:9221
 
   docs:
     platform: linux/amd64

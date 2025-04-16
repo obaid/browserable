@@ -66,6 +66,11 @@ ${Object.keys(variables)
         : ""
 }
 
+SOME BLOCKERS:
+- Dropdowns: Some input boxes are dropdowns. And the dropdowns open up after you type something first. You will have to make sure you type something + select the option from the dropdown to complete the action. Just typing the option won't work.
+- When unsure, always perform an action, make sure you set completed as false to see what stage the screen is after you performed your action. 
+- Once you see the next stage of the screen after performing an action, you can make a better decision on what to do next.
+
 # Possible tools
 1. doAction
 name: doAction
@@ -85,9 +90,16 @@ arguments:
 - reason: reason that no action is taken (string)
 - completed: true if the goal is already accomplished after this step (boolean)
 
+3. actionCompleted
+name: actionCompleted
+description: this action is completed.
+arguments:
+- reason: reason that the goal was completed (string)
+- completed: true if the goal is already accomplished after this step (boolean)
+
 OUTPUT FORMAT: JSON object
-key: "function_name". value of this key is doAction or skipSection
-value: doAction or skipSection
+key: "function_name". value of this key is doAction or skipSection or actionCompleted
+value: doAction or skipSection or actionCompleted
 arguments: 
 - keys are the argument names of the function
 - values are the argument values
@@ -187,9 +199,6 @@ Return a boolean value:
             role: "user",
             content: `# My Goal
 ${action}
-
-# Steps You've Taken So Far
-${steps}
 
 ${
     domElements

@@ -18,7 +18,6 @@ import {
   logout,
 } from "../actions";
 import useTreeChanges from "tree-changes-hook";
-import { Switch } from "@headlessui/react";
 import { useDropzone } from "react-dropzone";
 import toast from "react-hot-toast";
 
@@ -284,7 +283,7 @@ function SettingsContainer(props) {
                     <tbody>
                       {Object.entries({
                         OpenAI: "openai",
-                        Anthropic: "anthropic",
+                        Anthropic: "claude",
                         Gemini: "gemini",
                       }).map(([displayName, provider]) => (
                         <tr

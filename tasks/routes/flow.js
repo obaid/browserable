@@ -93,86 +93,88 @@ ONLY output the JSON, nothing else.`,
             });
 
             // figure out triggers
-            let triggers = [];
+            let triggers = [
+                "once|0|",
+            ];
 
-            const triggersResponse = await callOpenAICompatibleLLMWithRetry({
-                messages: [
-                    {
-                        role: "system",
-                        content: `You are a helpful assistant to figure out the when to run a task.`,
-                    },
-                    {
-                        role: "user",
-                        content: `Given the following task that user wants to run (user entered in natural language):
-------------
-${initMessage}
-------------
-
-
-Figure out the when to run the task. (i.e, what all triggers are possible for the task)
-
-Available triggers are:
-1. "once|<delay>|" ---> instantly creates a run with the provided delay. delay is in milliseconds.
-- Use this if the user asked to run something once. 
-- Or they asked to run something with a delay.
-- Or they didn't mention any other trigger at all.
-2. "crontab|<crontab_string>|" ---> creates a task with the crontab string to run as long as it is active
-- Use this if the user asked to run something repeatedly at some specific time/day/routine
-
-It's mandatory to have at least one trigger. Worst case, you can use "once|0|" as a trigger.
+//             const triggersResponse = await callOpenAICompatibleLLMWithRetry({
+//                 messages: [
+//                     {
+//                         role: "system",
+//                         content: `You are a helpful assistant to figure out the when to run a task.`,
+//                     },
+//                     {
+//                         role: "user",
+//                         content: `Given the following task that user wants to run (user entered in natural language):
+// ------------
+// ${initMessage}
+// ------------
 
 
-Available triggers for the task:
-${getAvailableTriggers({
-    agent_codes: [agent],
-})}
+// Figure out the when to run the task. (i.e, what all triggers are possible for the task)
 
-Current date and time at user's timezone: ${getReadableFromUTCToLocal(
-                            new Date(),
-                            timezoneOffsetInSeconds
-                        )}
+// Available triggers are:
+// 1. "once|<delay>|" ---> instantly creates a run with the provided delay. delay is in milliseconds.
+// - Use this if the user asked to run something once. 
+// - Or they asked to run something with a delay.
+// - Or they didn't mention any other trigger at all.
+// 2. "crontab|<crontab_string>|" ---> creates a task with the crontab string to run as long as it is active
+// - Use this if the user asked to run something repeatedly at some specific time/day/routine
 
-Current data and time at server's timezone: ${getReadableFromUTCToLocal(
-                            new Date(),
-                            0
-                        )}
+// It's mandatory to have at least one trigger. Worst case, you can use "once|0|" as a trigger.
 
-Timezone:
-Server is at UTC timezone.
-User's timezone offset is ${timezoneOffsetInSeconds} seconds.
 
-Rules:
-- When creating delay and crontab expressions, you need to take into account the user's timezone offset. and generate the value that server will use.
-- Ex: If the user's time is 4PM and user says run at 5PM. then delay is 1 hour.
-- Ex: If the user's time is 4PM and user says run at 3PM. then delay is 25 hours.
-- Ex: If the user's time is 4PM Monday (and server time is 2PM Monday) and user says run at 5PM every Monday. then crontab is "0 3 * * 1" (notice the 5PM user time is converted to 3PM server time)
+// Available triggers for the task:
+// ${getAvailableTriggers({
+//     agent_codes: [agent],
+// })}
 
-Output format: (JSON)
-{
-    "readableDescriptionOfTriggers": "<readableDescriptionOfTriggers>", // describe the triggers in a way that is easy to understand for the user
-    "triggers": ["trigger1", "trigger2", "trigger3"]
-}
+// Current date and time at user's timezone: ${getReadableFromUTCToLocal(
+//                             new Date(),
+//                             timezoneOffsetInSeconds
+//                         )}
 
-ONLY output the JSON, nothing else.`,
-                    },
-                ],
-                models: [
-                    "gemini-2.0-flash",
-                    "deepseek-chat",
-                    "deepseek-reasoner",
-                    "claude-3-5-sonnet",
-                    "gpt-4o",
-                    "qwen-plus",
-                ],
-                metadata: {
-                    [uniqueKeyInMetadata]: uniqueValInMetadata,
-                    accountId,
-                    usecase: "generator",
-                },
-                max_attempts: 5,
-            });
+// Current data and time at server's timezone: ${getReadableFromUTCToLocal(
+//                             new Date(),
+//                             0
+//                         )}
 
-            triggers = triggersResponse.triggers;
+// Timezone:
+// Server is at UTC timezone.
+// User's timezone offset is ${timezoneOffsetInSeconds} seconds.
+
+// Rules:
+// - When creating delay and crontab expressions, you need to take into account the user's timezone offset. and generate the value that server will use.
+// - Ex: If the user's time is 4PM and user says run at 5PM. then delay is 1 hour.
+// - Ex: If the user's time is 4PM and user says run at 3PM. then delay is 25 hours.
+// - Ex: If the user's time is 4PM Monday (and server time is 2PM Monday) and user says run at 5PM every Monday. then crontab is "0 3 * * 1" (notice the 5PM user time is converted to 3PM server time)
+
+// Output format: (JSON)
+// {
+//     "readableDescriptionOfTriggers": "<readableDescriptionOfTriggers>", // describe the triggers in a way that is easy to understand for the user
+//     "triggers": ["trigger1", "trigger2", "trigger3"]
+// }
+
+// ONLY output the JSON, nothing else.`,
+//                     },
+//                 ],
+//                 models: [
+//                     "gemini-2.0-flash",
+//                     "deepseek-chat",
+//                     "deepseek-reasoner",
+//                     "claude-3-5-sonnet",
+//                     "gpt-4o",
+//                     "qwen-plus",
+//                 ],
+//                 metadata: {
+//                     [uniqueKeyInMetadata]: uniqueValInMetadata,
+//                     accountId,
+//                     usecase: "generator",
+//                 },
+//                 max_attempts: 5,
+//             });
+
+            // triggers = triggersResponse.triggers;
 
             const task = initMessage;
 
@@ -190,9 +192,7 @@ ONLY output the JSON, nothing else.`,
                     metadata: {
                         agent_codes: [agent],
                         initMessage,
-                        readableDescriptionOfTriggers:
-                            triggersResponse?.readableDescriptionOfTriggers ||
-                            "",
+                        readableDescriptionOfTriggers: "Runs once immediately.",
                     },
                 },
             });

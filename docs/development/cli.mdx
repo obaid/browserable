@@ -1,0 +1,72 @@
+# CLI Commands
+
+The Browserable CLI provides a simple interface to set up and manage your Browserable development environment. Here's a comprehensive guide to all available commands.
+
+## Installation
+
+The CLI is included in the Browserable package. Once you have cloned the repository, you can use the CLI commands directly.
+
+## Available Commands
+
+### `browserable` or `browserable start`
+
+This is the default command that sets up and starts all Browserable services.
+
+**What it does:**
+
+1. Checks for required dependencies:
+   - Docker
+   - Docker Compose
+   - Node.js and npm
+
+2. Clones the Browserable repository (if not already present)
+
+3. Builds and starts all Docker containers
+
+4. Sets up and starts the local browser service
+
+5. Opens the admin UI in your default browser
+
+**Available Services:**
+
+After running this command, you can access the following services:
+
+- Admin UI: http://localhost:2001
+- Documentation: http://localhost:2002
+- API: http://localhost:2003
+- Database Studio: http://localhost:8000
+- Mongo Express: http://localhost:3300
+- MinIO S3 Storage: http://localhost:9001
+- Redis Queue System: http://localhost:2003/admin/queues
+
+### `browserable down`
+
+This command stops all running Browserable Docker services.
+
+**What it does:**
+
+1. Stops all Docker containers
+2. Removes containers while preserving data volumes
+
+### `browserable --version`
+
+Displays the current version of the Browserable CLI.
+
+### `browserable --help`
+
+Shows the help menu with all available commands and their descriptions.
+
+## Troubleshooting
+
+If you encounter any issues while running the commands:
+
+1. **Missing Dependencies**
+   - For Docker: Visit https://docs.docker.com/engine/install/
+   - For Docker Compose: Visit https://docs.docker.com/compose/install/
+   - For Node.js and npm: Visit https://nodejs.org/en/download
+
+2. **Port Conflicts**
+   Make sure none of the required ports (2001-2003, 8000, 3300, 9001) are being used by other applications.
+
+3. **Docker Issues**
+   If Docker containers fail to start, try running `browserable down` first, then retry the start command.
