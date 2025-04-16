@@ -362,7 +362,7 @@ Rules:
                       <span className="text-sm text-yellow-800">
                         Please start local browser (follow the guide{" "}
                         <a
-                          href="https://docs.browserable.ai/development/local-development"
+                          href="https://docs.browserable.ai/development/local-development#start-the-local-browser-service"
                           target="_blank"
                           rel="noopener noreferrer"
                         >

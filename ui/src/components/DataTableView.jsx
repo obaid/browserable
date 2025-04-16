@@ -181,7 +181,7 @@ function DataTableView({ flowId }) {
             {documents.map((document, index) => (
               <tr key={document.rowId} className="hover:bg-gray-50">
                 <td className="px-6 py-1.5 whitespace-nowrap text-xs max-w-[250px] truncate cursor-pointer">
-                  {index + 1 + (pageNumber - 1) * pageSize}
+                  {(index + 1 + (pageNumber - 1) * pageSize) + '.'}
                 </td>
                 {schema.map((column) => (
                   <td
