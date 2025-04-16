@@ -3638,11 +3638,11 @@ agentQueue.process("create-gif", async (job, done) => {
 
     if (success && gifUrl) {
         // update the gifUrl in the private data of this run
-        await updateRunKeyVal({
+        await upsertRunPrivateData({
             runId,
             data: {
-                gifUrl,
-            },
+                gifUrl
+            }
         });
     }
     done();

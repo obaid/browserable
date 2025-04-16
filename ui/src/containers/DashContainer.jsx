@@ -112,7 +112,9 @@ function Dash(props) {
 When to use this:
 - If you are stuck and you need help from user
 - Captchas that you are not able to solve yourself
-- Logins, Signups etc.`,
+- Logins, Signups etc.
+Rules:
+- Only ask information that you need from a human who doesn't understand your system like tab ids etc.`,
                 parameters: {
                   type: "object",
                   properties: {

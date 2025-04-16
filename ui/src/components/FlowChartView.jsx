@@ -26,6 +26,13 @@ function FlowChartView({ flowId }) {
     setSelectedRunId(null);
   }, [flowId]);
 
+  // Auto-select first run when runs are loaded
+  useEffect(() => {
+    if (flowRuns.data?.length > 0 && !selectedRunId) {
+      setSelectedRunId(flowRuns.data[0].id);
+    }
+  }, [flowRuns.data]);
+
   // Fetch chart data when selectedRunId changes
   useEffect(() => {
     if (selectedRunId) {
@@ -33,56 +40,9 @@ function FlowChartView({ flowId }) {
     }
   }, [selectedRunId, flowId, accountId]);
 
-  const handlePrevPage = () => {
-    if (flowRuns.loading) return;
-
-    if (flowRuns.pageNumber > 1) {
-      dispatch(
-        getFlowRuns({
-          flowId,
-          pageSize,
-          pageNumber: flowRuns.pageNumber - 1,
-          accountId,
-        })
-      );
-    }
-  };
-
-  const handleNextPage = () => {
-    if (flowRuns.loading) return;
-
-    if (flowRuns.pageNumber < flowRuns.totalPages) {
-      dispatch(
-        getFlowRuns({
-          flowId,
-          pageSize,
-          pageNumber: flowRuns.pageNumber + 1,
-          accountId,
-        })
-      );
-    }
-  };
-
-  const handleRefresh = () => {
-    if (flowRuns.loading) return;
-
-    dispatch(
-      getFlowRuns({
-        flowId,
-        pageSize,
-        pageNumber: flowRuns.pageNumber,
-        accountId,
-      })
-    );
-  };
-
   useEffect(() => {
     dispatch(getFlowRuns({ flowId, pageSize, pageNumber: 1, accountId }));
   }, [flowId, pageSize, accountId]);
-
-  const handleRunClick = (runId) => {
-    setSelectedRunId(runId);
-  };
 
   const handleChartRefresh = () => {
     if (selectedRunId && !selectedChart?.loading) {
@@ -162,75 +122,19 @@ function FlowChartView({ flowId }) {
     );
   };
 
+  // Show loader while fetching initial runs
+  if (flowRuns.loading && !flowRuns.data?.length) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="animate-spin">
+          <i className="ri-loader-4-line text-2xl text-gray-400"></i>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full min-h-0">
-      <div className="w-64 max-w-64 min-w-64 border-r flex flex-col">
-        <div className="flex flex-col max-h-full overflow-y-auto flex-grow flex-shrink-0">
-          {flowRuns.data?.map((run, index) => (
-            <div
-              key={run.id}
-              className={`px-4 py-2 border-b  cursor-pointer ${
-                selectedRunId === run.id ? "bg-blue-50" : "hover:bg-gray-50"
-              }`}
-              onClick={() => handleRunClick(run.id)}
-            >
-              <div
-                className={`text-sm ${
-                  selectedRunId === run.id ? "font-black" : "font-semibold"
-                } mb-1`}
-              >
-                Run {(flowRuns.pageNumber - 1) * pageSize + index + 1}
-              </div>
-              <div className="text-xs text-gray-500">
-                {readableDate(run.created_at)}
-              </div>
-              <div className="text-xs text-gray-500">Status: {run.status}</div>
-            </div>
-          ))}
-        </div>
-        {flowRuns.totalPages > 1 && (
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center w-full gap-2 px-4 pt-4">
-              <button
-                onClick={handlePrevPage}
-                disabled={flowRuns.pageNumber <= 1}
-                className={`px-2 py-1 text-sm rounded-md border ${
-                  flowRuns.pageNumber <= 1
-                    ? "bg-gray-100 text-gray-400 border-gray-200"
-                    : "bg-white  border-gray-300 hover:bg-gray-50"
-                }`}
-              >
-                <i className="ri-arrow-left-line"></i>
-              </button>
-              <span className="text-sm  grow text-center">
-                Page {flowRuns.pageNumber} of {flowRuns.totalPages}
-              </span>
-              <button
-                onClick={handleNextPage}
-                disabled={flowRuns.pageNumber >= flowRuns.totalPages}
-                className={`px-2 py-1 text-sm rounded-md border ${
-                  flowRuns.pageNumber >= flowRuns.totalPages
-                    ? "bg-gray-100 text-gray-400 border-gray-200"
-                    : "bg-white  border-gray-300 hover:bg-gray-50"
-                }`}
-              >
-                <i className="ri-arrow-right-line"></i>
-              </button>
-              <button
-                onClick={handleRefresh}
-                className="p-1  hover:text-gray-800"
-              >
-                <i
-                  className={`ri-refresh-line block ${
-                    flowRuns.loading ? "animate-spin" : ""
-                  }`}
-                ></i>
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
       <div className="flex-1 relative overflow-hidden flex flex-col">
         {selectedRunId ? (
           <>
@@ -261,7 +165,7 @@ function FlowChartView({ flowId }) {
         ) : (
           <div className="absolute inset-0 flex items-center justify-center p-8">
             <div className="text-gray-500 text-center">
-              Select run to view the flow chart.
+              No runs available for this flow.
             </div>
           </div>
         )}

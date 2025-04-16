@@ -31,6 +31,7 @@ import DataTableView from "../components/DataTableView";
 import ProjectView from "../components/ProjectView";
 import FlowChartView from "../components/FlowChartView";
 import ReportView from "../components/ReportView";
+import GifView from "../components/GifView";
 
 const axiosInstance = axios.create({
   timeout: 50000,
@@ -616,6 +617,11 @@ function Flow(props) {
           label: "Results Table",
           component: dataTableTab,
         },
+        {
+          id: "gif-view",
+          label: "GIF",
+          component: <GifView flowId={flowId} />,
+        },
         ...(isDeepResearchAgent
           ? [
               {
@@ -636,6 +642,11 @@ function Flow(props) {
           id: "results-table",
           label: "Results Table",
           component: dataTableTab,
+        },
+        {
+          id: "gif-view",
+          label: "GIF",
+          component: <GifView flowId={flowId} />,
         },
         ...(isDeepResearchAgent
           ? [

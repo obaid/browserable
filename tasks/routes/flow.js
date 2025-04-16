@@ -952,7 +952,7 @@ router.post(
                 ),
                 tasksDB.query(
                     `SELECT id, status, error, input, trigger_input, created_at, 
-                            output, reasoning, structured_output, live_status
+                            output, reasoning, structured_output, live_status, private_data
                     FROM browserable.runs 
                     WHERE flow_id = $1 AND account_id = $2
                     ORDER BY created_at ${sortOrder}
