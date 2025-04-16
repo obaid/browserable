@@ -149,6 +149,7 @@ async function startDockerCompose() {
   console.log(chalk.blue('Building Docker containers...'));
   const dockerCmd = await dockerBaseCommand();
   const repoPath = getRepoPath();
+  const originalDir = process.cwd();
   
   try {
     process.chdir(path.join(repoPath, 'deployment'));
@@ -175,8 +176,12 @@ async function startDockerCompose() {
       });
     }
     console.log(chalk.green('\nDocker containers built and started successfully'));
+    // Restore original directory
+    process.chdir(originalDir);
     return true;
   } catch (error) {
+    // Restore original directory even on error
+    process.chdir(originalDir);
     console.error(chalk.red('Failed to build or start Docker containers'));
     console.error(chalk.red(error.message));
     return false;
