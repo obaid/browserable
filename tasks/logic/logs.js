@@ -29,8 +29,13 @@ async function downloadImage(url) {
 
 // Create GIF from array of image buffers
 async function createGif(imageBuffers) {
-    const encoder = new GIFEncoder(800, 600); // Set dimensions as needed
-    const canvas = new Canvas(800, 600);
+    const width = Number(process.env.BROWSER_WIDTH) || 800;
+    const height = Number(process.env.BROWSER_HEIGHT) || 600;
+    // scale down 0.8
+    const scaledWidth = width * 0.8;
+    const scaledHeight = height * 0.8;
+    const encoder = new GIFEncoder(scaledWidth, scaledHeight); // Set dimensions as needed
+    const canvas = new Canvas(scaledWidth, scaledHeight);
     const ctx = canvas.getContext('2d');
     
     encoder.start();
@@ -41,7 +46,7 @@ async function createGif(imageBuffers) {
     for (const buffer of imageBuffers) {
         // Create a new Image instance
         const image = await sharp(buffer)
-            .resize(800, 600, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } })
+            .resize(scaledWidth, scaledHeight, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } })
             .toFormat('png')  // Convert to PNG for better compatibility
             .toBuffer();
             

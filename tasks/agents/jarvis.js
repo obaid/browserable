@@ -3281,6 +3281,8 @@ ${JSON.stringify(aiData, null, 2)}
                                     subtask,
                                 });
                             }
+
+                            documents.push(addedDocument);
                         }
 
                         for (const row of rowsToUpdate) {
@@ -3308,6 +3310,8 @@ ${JSON.stringify(aiData, null, 2)}
                                     subtask,
                                 });
                             }
+
+                            documents.push(updatedDocument);
                         }
                     }
 
