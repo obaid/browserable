@@ -400,7 +400,6 @@ Rules:
                 <div className="w-full max-w-xl bg-gray-100 rounded-xl p-2 ring-0">
                   {nonGenerativeAiAgents.length > 0 && (
                     <div className="w-full flex flex-wrap gap-3 mb-2">
-                      {nonGenerativeAiAgents.map((agent) => (
                       {nonGenerativeAiAgents.map((agent) => {
                         // Skip DEEPRESEARCH_AGENT if local browser is available
                         if (agent.code === "DEEPRESEARCH_AGENT" && localBrowserServiceStatus === "ok") {
