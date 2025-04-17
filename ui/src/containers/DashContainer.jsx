@@ -401,23 +401,30 @@ Rules:
                   {nonGenerativeAiAgents.length > 0 && (
                     <div className="w-full flex flex-wrap gap-3 mb-2">
                       {nonGenerativeAiAgents.map((agent) => (
-                        <div
-                          key={agent.code}
-                          className="flex font-semibold items-center gap-1 cursor-pointer hover:bg-gray-200 px-2 py-0.5 rounded-md transition-colors duration-150"
-                          onClick={() =>
-                            setSelectedNonGenerativeAgent(agent.code)
-                          }
-                        >
-                          <i
-                            className={` ${
-                              selectedNonGenerativeAgent === agent.code
-                                ? "text-black ri-checkbox-circle-fill"
-                                : "text-gray-500 ri-checkbox-blank-circle-line"
-                            }`}
-                          ></i>
-                          <span className="text-sm">{agent.label}</span>
-                        </div>
-                      ))}
+                      {nonGenerativeAiAgents.map((agent) => {
+                        // Skip DEEPRESEARCH_AGENT if local browser is available
+                        if (agent.code === "DEEPRESEARCH_AGENT" && localBrowserServiceStatus === "ok") {
+                          return null;
+                        }
+                        return (
+                          <div
+                            key={agent.code}
+                            className="flex font-semibold items-center gap-1 cursor-pointer hover:bg-gray-200 px-2 py-0.5 rounded-md transition-colors duration-150"
+                            onClick={() => {
+                              setSelectedNonGenerativeAgent(agent.code);
+                            }}
+                          >
+                            <i
+                              className={` ${
+                                selectedNonGenerativeAgent === agent.code
+                                  ? "text-black ri-checkbox-circle-fill"
+                                  : "text-gray-500 ri-checkbox-blank-circle-line"
+                              }`}
+                            ></i>
+                            <span className="text-sm">{agent.label}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                   <TextareaAutosize
