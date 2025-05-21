@@ -99,6 +99,12 @@ async function callOpenAICompatibleLLMWithRetry({
             if (llmKeys["qwen"]) {
                 accountSpecificModelKeys["qwen-plus"] = llmKeys["qwen"];
             }
+            if (llmKeys["groq"]) {
+                accountSpecificModelKeys["groq"] = llmKeys["groq"];
+            }
+            if (llmKeys["openrouter"]) {
+                accountSpecificModelKeys["openrouter"] = llmKeys["openrouter"];
+            }
         }
     }
 
@@ -129,6 +135,12 @@ async function callOpenAICompatibleLLMWithRetry({
 
     if (!!process.env.QWEN_API_KEY) {
         serverSpecificModelKeys["qwen-plus"] = process.env.QWEN_API_KEY;
+    }
+    if (!!process.env.GROQ_API_KEY) {
+        serverSpecificModelKeys["groq"] = process.env.GROQ_API_KEY;
+    }
+    if (!!process.env.OPENROUTER_API_KEY) {
+        serverSpecificModelKeys["openrouter"] = process.env.OPENROUTER_API_KEY;
     }
 
     const modelKeys = Object.assign(
@@ -259,6 +271,22 @@ async function callOpenAICompatibleLLM({
             supportedImageAs: "base64",
             supportedJsonSchema: false,
             supportedJsonOutput: false,
+        },
+        "groq": {
+            endpoint: process.env.GROQ_API_BASE_URL || "https://api.groq.com/v1/chat/completions",
+            apiKey: modelKeys["groq"],
+            actualModel: "groq",
+            supportedImageAs: "url",
+            supportedJsonSchema: false,
+            supportedJsonOutput: true,
+        },
+        "openrouter": {
+            endpoint: process.env.OPENROUTER_API_BASE_URL || "https://api.openrouter.ai/v1/chat/completions",
+            apiKey: modelKeys["openrouter"],
+            actualModel: "openrouter",
+            supportedImageAs: !!Number(process.env.SINGLE_USER_MODE) ? "base64" : "url",
+            supportedJsonSchema: true,
+            supportedJsonOutput: true,
         },
     };
 

@@ -84,6 +84,8 @@ This document details all the environment variables used in the Browserable serv
 | `QWEN_API_KEY` | "" | Qwen API key |
 | `GEMINI_API_KEY` | "" | Gemini API key |
 | `DEEPSEEK_API_KEY` | "" | Deepseek API key |
+| `GROQ_API_KEY` | "" | Groq API key |
+| `OPENROUTER_API_KEY` | "" | OpenRouter API key |
 | `STEEL_API_KEY` | "" | Steel browser API key |
 | `HYPER_BROWSER_API_KEY` | "" | Hyper browser API key |
 | `BROWSERBASE_API_KEY` | "" | Browserbase API key |
